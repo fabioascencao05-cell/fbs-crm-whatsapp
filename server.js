@@ -56,9 +56,13 @@ const enviarMensagemEvolution = async (number, text) => {
 const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
     try {
         const msgs = await prisma.mensagem.findMany({ where: { conversaId: conversaId }, orderBy: { criado_em: 'asc' }, take: 15 });
-        const historico = msgs.map(m => ({ role: m.origem === 'cliente' ? 'user' : 'model', parts: [{ text: m.texto }] }));
+        const historico = [];
+        historico.push({ role: 'user', parts: [{ text: "REGRAS ABSOLUTAS E PERMANENTES DO SISTEMA: " + SYSTEM_PROMPT }]});
+        historico.push({ role: 'model', parts: [{ text: "Entendido perfeitamente. Sou a Vendedora." }]});
+        historico.push(...msgs.map(m => ({ role: m.origem === 'cliente' ? 'user' : 'model', parts: [{ text: m.texto }] })));
+
         
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash", systemInstruction: SYSTEM_PROMPT });
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
         const userMsg = historico.pop();
         
         const chat = model.startChat({ history: historico, generationConfig: { maxOutputTokens: 150, temperature: 0.7 }});
