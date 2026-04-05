@@ -34,15 +34,21 @@ Qualidade: Reforce sempre: "Material de alta qualidade, tecido resistente e acab
 
 const enviarMensagemEvolution = async (number, text) => {
     try {
+        if (!text) throw new Error("Texto vazio bloqueado antes do envio.");
+        
         const url = `${process.env.EVOLUTION_API_URL}/message/sendText/${process.env.EVOLUTION_INSTANCE}`;
-        await axios.post(url, {
-            number: number,
+        const payload = {
+            number: String(number),
             options: { delay: 1200 },
-            textMessage: { text: text }
-        }, { headers: { 'apikey': process.env.EVOLUTION_API_KEY } });
+            textMessage: { text: String(text) }
+        };
+        
+        console.log("📦 PAYLOAD PARA EVOLUTION:", JSON.stringify(payload));
+        
+        await axios.post(url, payload, { headers: { 'apikey': process.env.EVOLUTION_API_KEY } });
         return true;
     } catch (error) {
-        console.error('Erro ao enviar para Evolution:', error?.response?.data || error.message);
+        console.error("❌ MOTIVO DA REJEIÇÃO:", JSON.stringify(error.response?.data || error.message));
         return false;
     }
 };
