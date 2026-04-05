@@ -1,0 +1,61 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Conversa {
+  id              String     @id
+  nome            String
+  telefone        String
+  status_bot      Boolean    @default(true)
+  ultima_mensagem String?
+  
+  // Phase 5 Fills
+  status_kanban   String     @default("Novos") // Novos, Em Orçamento, Aguardando Arte/Aprovação, Em Produção, Finalizado
+  tags            String?    // Ex: "Atacado,Urgente"
+  
+  criado_em       DateTime   @default(now())
+  atualizado_em   DateTime   @updatedAt
+  mensagens       Mensagem[]
+  pedidos         Pedido[]
+}
+
+model Mensagem {
+  id         String   @id @default(uuid())
+  conversaId String
+  conversa   Conversa @relation(fields: [conversaId], references: [id])
+  texto      String
+  
+  // Phase 5 Fills
+  mediaUrl   String?
+  mediaType  String?  // 'image', 'audio', 'video', 'document'
+  
+  origem     String   // "cliente" ou "bot" ou "loja"
+  criado_em  DateTime @default(now())
+}
+
+model Pedido {
+  id             String   @id @default(uuid())
+  conversaId     String
+  conversa       Conversa @relation(fields: [conversaId], references: [id])
+  quantidade     Int      @default(1)
+  tamanho        String?  // P, M, G, GG
+  cor            String?
+  local_estampa  String?
+  valor_total    Float    @default(0)
+  sinal_pago     Float    @default(0)
+  saldo_devedor  Float    @default(0)
+  status         String   @default("Pendente")
+  criado_em      DateTime @default(now())
+}
+
+model RespostaRapida {
+  id         String   @id @default(uuid())
+  atalho     String   // ex: "/pix"
+  texto      String   // ex: "Nossa chave pix é X"
+  criado_em  DateTime @default(now())
+}
