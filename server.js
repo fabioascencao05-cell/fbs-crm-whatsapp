@@ -18,19 +18,19 @@ const upload = multer({ storage: multer.memoryStorage() });
 const prisma = new PrismaClient();
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'no_key');
 
-const SYSTEM_PROMPT = `Persona: Atendente virtual da FBS Camisetas (Mauá-SP). Humano, simples e educado.
+const SYSTEM_PROMPT = `Persona: Você é a Pepita, a assistente de vendas da FBS Camisetas (Mauá-SP). Você é educada, humanizada, objetiva e persuasiva.
+Missão: Coletar NOME, QUANTIDADE e CEP e tentar encaminhar a venda para o fechamento.
 
-Missão: Coletar NOME, QUANTIDADE e CEP.
+REGRAS DE OURO:
+1. Comece sempre descobrindo o NOME do cliente. Se já tiver o nome no histórico, não pergunte novamente.
+2. NUNCA DÊ PREÇOS DIRETOS. O preço depende de várias coisas. Sua meta é coletar os dados para o Fabio fazer o orçamento final.
+3. Foque em FECHAR negócio: Demonstre que nosso produto resolve o problema dele. Use gatilhos de qualidade.
+4. Prazo médio de entrega é de 10 a 15 dias após aprovação do layout.
+5. Use frases curtas. Apenas 1 emoji por mensagem.
 
-Regra de Ouro: Peça o NOME antes de qualquer coisa. Se já sabe o nome (e o cliente já se identificou antes no histórico da conversa), nunca pergunte de novo. Use frases curtas e no máximo 1 emoji por frase.
-
-Produtos: Algodão, Malha Fria, Gola V, Baby Look, Polo. (Atenção: Malha fria não tem Baby Look!).
-
-Preços: Nunca dê preço direto. Peça Quantidade e CEP primeiro para a equipe orçar.
-
-Localização: Mauá - SP (Atende o Brasil todo).
-
-Qualidade: Reforce sempre: "Material de alta qualidade, tecido resistente e acabamento caprichado".`;
+PRODUTOS: Trabalhamos com Algodão, Malha Fria, Gola V, Baby Look (Atenção: Malha fria NÃO tem Baby Look!) e Polo.
+LOCALIZAÇÃO: Sede em Mauá - SP, mas enviamos para todo o Brasil.
+QUALIDADE: Reforce que nossa estamparia é premium, não desbota e o tecido tem alta durabilidade.`;
 
 const enviarMensagemEvolution = async (number, text) => {
     try {
@@ -55,7 +55,8 @@ const enviarMensagemEvolution = async (number, text) => {
 
 const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
     try {
-        const msgs = await prisma.mensagem.findMany({ where: { conversaId: conversaId }, orderBy: { criado_em: 'asc' }, take: 15 });
+        // Economia de Créditos: Busca apenas as ÚLTIMAS 6 mensagens para poupar tokens do Gemini
+        const msgs = await prisma.mensagem.findMany({ where: { conversaId: conversaId }, orderBy: { criado_em: 'asc' }, take: 6 });
         const historico = [];
         historico.push({ role: 'user', parts: [{ text: "REGRAS ABSOLUTAS E PERMANENTES DO SISTEMA: " + SYSTEM_PROMPT }]});
         historico.push({ role: 'model', parts: [{ text: "Entendido perfeitamente. Sou a Vendedora." }]});
@@ -175,7 +176,12 @@ app.post('/api/webhook', async (req, res) => {
                 await enviarMensagemEvolution(number, respostaIA);
                 await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: respostaIA, origem: 'bot' } });
             } else {
-                 console.log('❌ Resposta da IA retornou vazia ou com erro.');
+                 console.log('❌ Resposta da IA falhou (Ex: Erro 429). Acionando PLANO B (Fallback)...');
+                 const fallbackTexto = "Oi! Aqui é a assistente da FBS. Estou com muita demanda agora, mas o Fabio já foi avisado e vai te atender pessoalmente no capricho em instantes!";
+                 await enviarMensagemEvolution(number, fallbackTexto);
+                 await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: fallbackTexto, origem: 'bot' } });
+                 // Desliga o bot para evitar repetição do texto de erro a cada nova msg do usuário
+                 await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: false }});
             }
         } else {
             console.log('🛑 IA ignorada. Motivo:', { status_bot: conversa.status_bot, silencio_10m: silencio, contem_midia: !!mediaType });
