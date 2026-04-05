@@ -142,8 +142,17 @@ app.post('/api/webhook', async (req, res) => {
         if (ultimaMensagemHumano) {
             const minH = (new Date() - ultimaMensagemHumano.criado_em) / 60000;
             if (minH <= 10) {
-                silencio = true;
-                await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: false }});
+                // O humano falou a menos de 10 min. 
+                // SÓ forçamos o silêncio se o botão do Bot NÃO foi religado pelo humano.
+                if (conversa.status_bot === false) {
+                    silencio = true;
+                }
+            } else {
+                // Já passou 10 minutos! O robô deve voltar a trabalhar automaticamente!
+                if (conversa.status_bot === false) {
+                    await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
+                    conversa.status_bot = true; // Atualiza pro ciclo atual
+                }
             }
         }
 
