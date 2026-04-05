@@ -147,13 +147,25 @@ app.post('/api/webhook', async (req, res) => {
             }
         }
 
-        if (conversa.status_bot === true && !silencio && !mediaType) { // Evita robô tentar responder a uma imagem sem texto util
-            if(!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'no_key') return;
+        if (conversa.status_bot === true && !silencio && !mediaType) {
+            console.log('🤖 Checando chave do Gemini para Acionar IA...');
+            if(!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'no_key') {
+                console.log('❌ IA CANCELADA: GEMINI_API_KEY não foi encontrada nas variáveis de ambiente!');
+                return;
+            }
+            
+            console.log('🤖 Acionando IA para responder...');
             const respostaIA = await gerarRespostaIA(conversa.id, pushName, msgText);
+            
             if(respostaIA) {
+                console.log('✅ Resposta da IA gerada, enviando via Evolution...');
                 await enviarMensagemEvolution(number, respostaIA);
                 await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: respostaIA, origem: 'bot' } });
+            } else {
+                 console.log('❌ Resposta da IA retornou vazia ou com erro.');
             }
+        } else {
+            console.log('🛑 IA ignorada. Motivo:', { status_bot: conversa.status_bot, silencio_10m: silencio, contem_midia: !!mediaType });
         }
     } catch (err) { console.error('Erro DB webhook:', err); }
 });
