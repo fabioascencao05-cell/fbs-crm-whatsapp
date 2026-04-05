@@ -139,15 +139,26 @@ app.post('/api/webhook', async (req, res) => {
             data: { conversaId: conversa.id, texto: msgText, mediaUrl: mediaUrl, mediaType: mediaType, origem: 'cliente' }
         });
 
+        // Carrega respostas rápidas para ignorá-las como "interação humana"
+        const respostasRapidas = await prisma.respostaRapida.findMany();
+        const textosIgnorados = respostasRapidas.map(r => r.texto.trim());
+        // Inclui também a mensagem de fallback do bot para ignorar caso tenha sido enviada manualmente
+        textosIgnorados.push("Oi! Aqui é a assistente da FBS. Estou com muita demanda agora, mas o Fabio já foi avisado e vai te atender pessoalmente no capricho em instantes!");
+
         const ultimaMensagemHumano = await prisma.mensagem.findFirst({
-            where: { conversaId: conversa.id, origem: 'loja' }, orderBy: { criado_em: 'desc' }
+            where: { 
+                conversaId: conversa.id, 
+                origem: 'loja',
+                texto: { notIn: textosIgnorados } // EXCLUI AS SAUDAÇÕES AUTOMÁTICAS E QUICK REPLIES
+            }, 
+            orderBy: { criado_em: 'desc' }
         });
 
         let silencio = false;
         if (ultimaMensagemHumano) {
             const minH = (new Date() - ultimaMensagemHumano.criado_em) / 60000;
             if (minH <= 10) {
-                // O humano falou a menos de 10 min. 
+                // O humano falou a menos de 10 min de forma manual (texto único)
                 // SÓ forçamos o silêncio se o botão do Bot NÃO foi religado pelo humano.
                 if (conversa.status_bot === false) {
                     silencio = true;
@@ -158,6 +169,13 @@ app.post('/api/webhook', async (req, res) => {
                     await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
                     conversa.status_bot = true; // Atualiza pro ciclo atual
                 }
+            }
+        } else {
+            // Se NÃO tem mensagem humana recente válida (ou se só teve saudação automática),
+            // GARANTIMOS QUE O BOT DEVE OPERAR!
+            if (conversa.status_bot === false) {
+                await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
+                conversa.status_bot = true;
             }
         }
 
