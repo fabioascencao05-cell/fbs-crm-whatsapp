@@ -46,7 +46,9 @@ PRODUTOS (só fale se perguntarem):
 
 LOCALIZAÇÃO (só fale se perguntarem): Mauá - SP. Atendemos todo o Brasil.
 
-OBJETIVO: Coletar NOME, QUANTIDADE e CEP. Depois encaminhar para orçamento.`;
+OBJETIVO: Coletar NOME, QUANTIDADE e CEP. Depois encaminhar para orçamento.
+
+REGRA DE ENCERRAMENTO: Depois que o cliente informar quantidade e CEP e você enviar a mensagem de encaminhamento para orçamento, NÃO fale mais. Se o cliente mandar outra mensagem depois disso, responda apenas algo como "O Fabio já está cuidando do seu orçamento, em breve ele te retorna!" e nada mais. Não puxe assunto, não faça perguntas, não ofereça mais nada.`;
 
 const enviarMensagemEvolution = async (number, text) => {
     try {
