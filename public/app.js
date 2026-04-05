@@ -316,7 +316,7 @@ async function salvarFollowUp() {
     } catch(e) {}
 }
 
-async function enviarMsg() {
+async function enviarMsg(isQuickReply = false) {
     const input = document.getElementById('input-msg');
     const dateInput = document.getElementById('input-agendar');
     const texto = input.value.trim();
@@ -338,9 +338,9 @@ async function enviarMsg() {
     document.getElementById('chat-historico').scrollTop = document.getElementById('chat-historico').scrollHeight;
 
     try {
-        const res = await fetch(`/api/conversas/${conversaAtual.id}/enviar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto }) });
+        const res = await fetch(`/api/conversas/${conversaAtual.id}/enviar`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ texto, is_quick_reply: isQuickReply }) });
         if(res.ok) {
-            conversaAtual.status_bot = false;
+            if (!isQuickReply) conversaAtual.status_bot = false;
             renderBotBtn();
             carregarConversas();
             setTimeout(carregarMensagens, 500);
@@ -394,7 +394,7 @@ function renderListaQuickReplies(forPopup) {
         div.onclick = () => {
             document.getElementById('input-msg').value = q.texto;
             fecharQuickReply();
-            document.getElementById('input-msg').focus();
+            enviarMsg(true); // Envia automaticamente a quick reply
         };
         l.appendChild(div);
     });

@@ -170,14 +170,8 @@ app.post('/api/webhook', async (req, res) => {
                     conversa.status_bot = true; // Atualiza pro ciclo atual
                 }
             }
-        } else {
-            // Se NÃO tem mensagem humana recente válida (ou se só teve saudação automática),
-            // GARANTIMOS QUE O BOT DEVE OPERAR!
-            if (conversa.status_bot === false) {
-                await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
-                conversa.status_bot = true;
-            }
         }
+
 
         if (conversa.status_bot === true && !silencio && !mediaType) {
             console.log('🤖 Checando chave do Gemini para Acionar IA...');
@@ -250,8 +244,15 @@ app.post('/api/conversas/:id/enviar', async (req, res) => {
         const conversa = await prisma.conversa.findUnique({ where: { id: req.params.id } });
         const enviado = await enviarMensagemEvolution(conversa.telefone, req.body.texto);
         if (enviado) {
-            await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: req.body.texto, origem: 'loja' } });
-            await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: false, ultima_mensagem: req.body.texto, atualizado_em: new Date() } });
+            const origemStr = req.body.is_quick_reply ? 'bot' : 'loja';
+            await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: req.body.texto, origem: origemStr } });
+            
+            // Se foi uma quick reply (ou saudação automatica pelo painel), NÃO desliga o bot.
+            if (!req.body.is_quick_reply) {
+                await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: false, ultima_mensagem: req.body.texto, atualizado_em: new Date() } });
+            } else {
+                await prisma.conversa.update({ where: { id: req.params.id }, data: { ultima_mensagem: req.body.texto, atualizado_em: new Date() } });
+            }
             res.json({ success: true });
         } else { res.status(500).json({ error: 'Falha API' }); }
     } catch (err) { res.status(500).json({ error: err.message }); }
