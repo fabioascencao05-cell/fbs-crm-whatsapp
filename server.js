@@ -55,22 +55,45 @@ const enviarMensagemEvolution = async (number, text) => {
 
 const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
     try {
-        // Economia de Créditos: Busca apenas as ÚLTIMAS 6 mensagens para poupar tokens do Gemini
-        const msgs = await prisma.mensagem.findMany({ where: { conversaId: conversaId }, orderBy: { criado_em: 'asc' }, take: 6 });
+        // Pega as últimas 6 mensagens reais da conversa
+        const msgsDB = await prisma.mensagem.findMany({ 
+            where: { conversaId: conversaId }, 
+            orderBy: { criado_em: 'desc' }, 
+            take: 6 
+        });
+        const msgs = msgsDB.reverse(); // Reverte para a ordem cronológica correta (antiga -> nova)
+
         const historico = [];
         historico.push({ role: 'user', parts: [{ text: "REGRAS ABSOLUTAS E PERMANENTES DO SISTEMA: " + SYSTEM_PROMPT }]});
         historico.push({ role: 'model', parts: [{ text: "Entendido perfeitamente. Sou a Vendedora." }]});
-        historico.push(...msgs.map(m => ({ role: m.origem === 'cliente' ? 'user' : 'model', parts: [{ text: m.texto }] })));
 
+        // Consolidar mensagens sequenciais com a mesma role para não estourar erro 400 no Gemini
+        for (const m of msgs) {
+            const role = m.origem === 'cliente' ? 'user' : 'model';
+            const texto = m.texto;
+            if (!texto) continue;
+
+            const ultimo = historico[historico.length - 1];
+            if (ultimo.role === role) {
+                ultimo.parts[0].text += '\n' + texto;
+            } else {
+                historico.push({ role, parts: [{ text: texto }] });
+            }
+        }
         
         const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const userMsg = historico.pop();
+        
+        // Remove a última mensagem que obrigatoriamente tem que ser 'user' (já que é o cliente quem trigou o webhook)
+        // Se por algum motivo o último for model, a IA fará uma continuação esquisita, mas sendMessage exige um texto livre a parte.
+        const msgFinal = historico.pop();
         
         const chat = model.startChat({ history: historico, generationConfig: { maxOutputTokens: 150, temperature: 0.7 }});
-        const result = await chat.sendMessage(userMsg.parts[0].text);
+        const result = await chat.sendMessage(msgFinal.parts[0].text);
+        
         return result.response.text();
     } catch(err) {
-        console.error('Erro no Gemini', err); return null;
+        console.error('Erro no processamento do Gemini:', err); 
+        return null; // Força cair no fallback para não ficar mudo
     }
 }
 
@@ -139,40 +162,35 @@ app.post('/api/webhook', async (req, res) => {
             data: { conversaId: conversa.id, texto: msgText, mediaUrl: mediaUrl, mediaType: mediaType, origem: 'cliente' }
         });
 
-        // Carrega respostas rápidas para ignorá-las como "interação humana"
-        const respostasRapidas = await prisma.respostaRapida.findMany();
-        const textosIgnorados = respostasRapidas.map(r => r.texto.trim());
-        // Inclui também a mensagem de fallback do bot para ignorar caso tenha sido enviada manualmente
-        textosIgnorados.push("Oi! Aqui é a assistente da FBS. Estou com muita demanda agora, mas o Fabio já foi avisado e vai te atender pessoalmente no capricho em instantes!");
-
-        const ultimaMensagemHumano = await prisma.mensagem.findFirst({
-            where: { 
-                conversaId: conversa.id, 
-                origem: 'loja',
-                texto: { notIn: textosIgnorados } // EXCLUI AS SAUDAÇÕES AUTOMÁTICAS E QUICK REPLIES
-            }, 
+        // ========== LÓGICA DE SILÊNCIO SIMPLIFICADA ==========
+        // Só silencia se o HUMANO (Fabio) mandou mensagem manual nos últimos 10 min
+        const ultimaMsgHumana = await prisma.mensagem.findFirst({
+            where: { conversaId: conversa.id, origem: 'loja' },
             orderBy: { criado_em: 'desc' }
         });
 
         let silencio = false;
-        if (ultimaMensagemHumano) {
-            const minH = (new Date() - ultimaMensagemHumano.criado_em) / 60000;
-            if (minH <= 10) {
-                // O humano falou a menos de 10 min de forma manual (texto único)
-                // SÓ forçamos o silêncio se o botão do Bot NÃO foi religado pelo humano.
-                if (conversa.status_bot === false) {
-                    silencio = true;
-                }
-            } else {
-                // Já passou 10 minutos! O robô deve voltar a trabalhar automaticamente!
-                if (conversa.status_bot === false) {
-                    await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
-                    conversa.status_bot = true; // Atualiza pro ciclo atual
-                }
+        if (ultimaMsgHumana) {
+            const minutosSilencio = (new Date() - ultimaMsgHumana.criado_em) / 60000;
+            if (minutosSilencio <= 10 && conversa.status_bot === false) {
+                // Humano falou há menos de 10 min E o bot está desligado manualmente
+                silencio = true;
+                console.log(`🤫 Silêncio ativo: humano falou há ${minutosSilencio.toFixed(1)} min`);
+            } else if (minutosSilencio > 10 && conversa.status_bot === false) {
+                // Já passou 10 min, religa o bot automaticamente
+                await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
+                conversa.status_bot = true;
+                console.log('🔄 Bot religado automaticamente (10 min de silêncio humano)');
             }
+        } else if (conversa.status_bot === false) {
+            // Nunca houve msg humana mas bot está desligado (ex: desligou após erro 429)
+            // Religa automaticamente para não travar pra sempre
+            await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: true }});
+            conversa.status_bot = true;
+            console.log('🔄 Bot religado automaticamente (nenhuma msg humana encontrada)');
         }
 
-
+        // ========== ACIONAR IA ==========
         if (conversa.status_bot === true && !silencio && !mediaType) {
             console.log('🤖 Checando chave do Gemini para Acionar IA...');
             if(!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'no_key') {
@@ -181,19 +199,26 @@ app.post('/api/webhook', async (req, res) => {
             }
             
             console.log('🤖 Acionando IA para responder...');
-            const respostaIA = await gerarRespostaIA(conversa.id, pushName, msgText);
+            let respostaIA = await gerarRespostaIA(conversa.id, pushName, msgText);
+            
+            // RETRY: Se falhou (erro 429), espera 10 segundos e tenta UMA vez mais
+            if (!respostaIA) {
+                console.log('⏳ Primeira tentativa falhou. Aguardando 10s para retry...');
+                await new Promise(r => setTimeout(r, 10000));
+                respostaIA = await gerarRespostaIA(conversa.id, pushName, msgText);
+            }
             
             if(respostaIA) {
                 console.log('✅ Resposta da IA gerada, enviando via Evolution...');
                 await enviarMensagemEvolution(number, respostaIA);
                 await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: respostaIA, origem: 'bot' } });
             } else {
-                 console.log('❌ Resposta da IA falhou (Ex: Erro 429). Acionando PLANO B (Fallback)...');
+                 console.log('❌ Resposta da IA falhou após retry. Enviando fallback...');
                  const fallbackTexto = "Oi! Aqui é a assistente da FBS. Estou com muita demanda agora, mas o Fabio já foi avisado e vai te atender pessoalmente no capricho em instantes!";
                  await enviarMensagemEvolution(number, fallbackTexto);
                  await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: fallbackTexto, origem: 'bot' } });
-                 // Desliga o bot para evitar repetição do texto de erro a cada nova msg do usuário
-                 await prisma.conversa.update({ where: { id: conversa.id }, data: { status_bot: false }});
+                 // NÃO desliga o bot, mantém ligado para a próxima mensagem tentar novamente
+                 console.log('⚠️ Bot MANTIDO LIGADO para tentar novamente na próxima mensagem');
             }
         } else {
             console.log('🛑 IA ignorada. Motivo:', { status_bot: conversa.status_bot, silencio_10m: silencio, contem_midia: !!mediaType });
