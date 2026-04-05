@@ -73,11 +73,11 @@ const enviarMensagemEvolution = async (number, text) => {
 
 const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
     try {
-        // Pega as últimas 6 mensagens reais da conversa
+        // Pega as últimas 15 mensagens para a IA ter contexto completo da conversa
         const msgsDB = await prisma.mensagem.findMany({ 
             where: { conversaId: conversaId }, 
             orderBy: { criado_em: 'desc' }, 
-            take: 6 
+            take: 15 
         });
         const msgs = msgsDB.reverse(); // Reverte para a ordem cronológica correta (antiga -> nova)
 
@@ -105,7 +105,7 @@ const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
         // Se por algum motivo o último for model, a IA fará uma continuação esquisita, mas sendMessage exige um texto livre a parte.
         const msgFinal = historico.pop();
         
-        const chat = model.startChat({ history: historico, generationConfig: { maxOutputTokens: 300, temperature: 0.5 }});
+        const chat = model.startChat({ history: historico, generationConfig: { maxOutputTokens: 500, temperature: 0.5 }});
         const result = await chat.sendMessage(msgFinal.parts[0].text);
         
         return result.response.text();
@@ -133,7 +133,19 @@ app.post('/api/webhook', async (req, res) => {
     const messageData = body.data;
     const remoteJid = messageData.key.remoteJid;
     const fromMe = messageData.key.fromMe;
-    if (fromMe || remoteJid.includes('@g.us')) return;
+    if (remoteJid.includes('@g.us')) return; // Ignora grupos
+
+    // Se a mensagem é do próprio Fabio respondendo pelo WhatsApp, pausar o bot nessa conversa
+    if (fromMe) {
+        try {
+            const conversaExiste = await prisma.conversa.findUnique({ where: { id: remoteJid } });
+            if (conversaExiste && conversaExiste.status_bot === true) {
+                await prisma.conversa.update({ where: { id: remoteJid }, data: { status_bot: false } });
+                console.log('⏸️ Bot PAUSADO automaticamente — Fabio respondeu pelo WhatsApp em:', remoteJid);
+            }
+        } catch(e) { /* conversa pode não existir ainda */ }
+        return;
+    }
 
     const pushName = messageData.pushName || 'Desconhecido';
     const number = remoteJid.split('@')[0];
