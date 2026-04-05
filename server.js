@@ -81,7 +81,7 @@ const gerarRespostaIA = async (conversaId, nomeCliente, novaPergunta) => {
             }
         }
         
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
         
         // Remove a última mensagem que obrigatoriamente tem que ser 'user' (já que é o cliente quem trigou o webhook)
         // Se por algum motivo o último for model, a IA fará uma continuação esquisita, mas sendMessage exige um texto livre a parte.
