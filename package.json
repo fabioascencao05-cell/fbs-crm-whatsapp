@@ -8,7 +8,7 @@
     "dev": "nodemon server.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.11.0",
+    "@google/generative-ai": "latest",
     "@prisma/client": "^5.12.1",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
