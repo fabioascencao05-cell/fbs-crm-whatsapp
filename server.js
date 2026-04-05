@@ -37,7 +37,7 @@ const enviarMensagemEvolution = async (number, text) => {
         const url = `${process.env.EVOLUTION_API_URL}/message/sendText/${process.env.EVOLUTION_INSTANCE}`;
         await axios.post(url, {
             number: number,
-            options: { delay: 1200, presence: "composing", presenceTime: 2000 },
+            options: { delay: 1200 },
             textMessage: { text: text }
         }, { headers: { 'apikey': process.env.EVOLUTION_API_KEY } });
         return true;
