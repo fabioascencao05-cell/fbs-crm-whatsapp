@@ -274,14 +274,7 @@ app.post('/api/webhook', async (req, res) => {
             return;
         }
 
-        // ========== CHECAGEM: HORÁRIO COMERCIAL ==========
-        if (!estaEmHorarioComercial()) {
-            console.log('🌙 Fora do horário comercial. Enviando msg automática.');
-            const msgForaHorario = 'Oi! No momento estamos fora do horário de atendimento (seg a sáb, 8h às 20h). Assim que voltarmos, te respondemos! 😊';
-            await enviarMensagemEvolution(number, msgForaHorario);
-            await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: msgForaHorario, origem: 'bot' } });
-            return;
-        }
+        // Bot responde 24/7 — sem restrição de horário
 
         // ========== ACIONAR IA ==========
         if (!mediaType) {
