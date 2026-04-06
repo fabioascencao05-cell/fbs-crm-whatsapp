@@ -41,7 +41,7 @@ FLUXO DE ATENDIMENTO (siga em ordem, pule etapas se o cliente já deu a info):
 
 ETAPA 1 - ABERTURA: Pergunte pra quê são as camisetas (igreja, empresa, evento, turma...).
 ETAPA 2 - QUANTIDADE: Pergunte quantas peças (até 10, de 10 a 20, ou mais de 20).
-ETAPA 3 - ARTE: Pergunte se já tem arte ou quer que a gente crie. Se não tiver: "Tranquilo, a gente cria sim! Depois do sinal a gente manda pra você aprovar."
+ETAPA 3 - ARTE: Pergunte se já tem a arte pronta. Se não tiver: "Tranquilo! A criação da arte é feita depois do pagamento do sinal, aí a gente manda pra você aprovar antes de produzir." NUNCA ofereça criação de arte de graça ou antes do pagamento.
 ETAPA 4 - MODELO: Pergunte o modelo (tradicional, oversized, baby look ou polo). Se não souber: "A tradicional é a mais pedida!"
 ETAPA 5 - TECIDO: Pergunte o tecido (algodão = confortável, malha fria = fresquinha).
 ETAPA 6 - PRAZO: Pergunte pra quando precisa. Se prazo normal (4+ dias): siga para etapa 7. Se prazo urgente (menos de 4 dias): "Esse prazo é bem apertado! Vou consultar a produção pra ver se consigo encaixar e já te retorno, tá bom?" — DEPOIS DISSO PARE DE RESPONDER.
@@ -346,8 +346,28 @@ app.post('/api/conversas/:id/pausar', async (req, res) => {
 });
 
 app.post('/api/conversas/:id/ativar', async (req, res) => {
-    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: true } });
-    res.json({ success: true });
+    try {
+        const conversa = await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: true } });
+        
+        // Envia mensagem imediata da Natália retomando o atendimento
+        const msgRetomada = 'Oi! Aqui é a Natália da FBS Camisetas! Como posso te ajudar? 😊';
+        await enviarMensagemEvolution(conversa.telefone, msgRetomada);
+        await prisma.mensagem.create({ data: { conversaId: conversa.id, texto: msgRetomada, origem: 'bot' } });
+        
+        console.log('🤖 Bot ATIVADO e enviou mensagem de retomada para:', conversa.telefone);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// Deletar conversa e todas as mensagens/pedidos relacionados
+app.delete('/api/conversas/:id', async (req, res) => {
+    try {
+        await prisma.mensagem.deleteMany({ where: { conversaId: req.params.id } });
+        await prisma.pedido.deleteMany({ where: { conversaId: req.params.id } });
+        await prisma.conversa.delete({ where: { id: req.params.id } });
+        console.log('🗑️ Conversa excluída:', req.params.id);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/conversas/:id/enviar', async (req, res) => {
