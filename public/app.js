@@ -240,6 +240,8 @@ async function abrirChat(c) {
     renderBotBtn();
     await carregarMensagens();
     carregarConversas();
+    // Mobile: mostrar chat
+    if(window.innerWidth <= 768) mobileAbrirChat();
 }
 
 function renderBotBtn() {
@@ -441,3 +443,55 @@ async function carregarDashboard() {
 carregarQuickReplies();
 carregarConversas(true);
 setInterval(()=>{carregarConversas(false);if(conversaAtual)carregarMensagens();},8000);
+
+// ===================== MOBILE NAVIGATION =====================
+function isMobile() { return window.innerWidth <= 768; }
+
+function mobileAbrirChat() {
+    document.querySelector('.conv-panel')?.classList.add('mobile-hidden');
+    document.querySelector('.chat-area')?.classList.add('mobile-show');
+}
+
+function mobileVoltarChat() {
+    if(!isMobile()) return;
+    document.querySelector('.conv-panel')?.classList.remove('mobile-hidden');
+    document.querySelector('.chat-area')?.classList.remove('mobile-show');
+}
+
+function mobileAbrirInfo() {
+    if(!isMobile()) return;
+    document.getElementById('erp-area')?.classList.add('mobile-show');
+}
+
+function mobileFecharInfo() {
+    if(!isMobile()) return;
+    document.getElementById('erp-area')?.classList.remove('mobile-show');
+}
+
+function mobileSwitchTab(tab) {
+    // Reset
+    document.querySelector('.conv-panel')?.classList.remove('mobile-hidden');
+    document.querySelector('.chat-area')?.classList.remove('mobile-show');
+    document.querySelectorAll('.mobile-nav-btn').forEach(b => b.classList.remove('active'));
+    
+    switchTab(tab);
+    
+    if(tab === 'chat') document.getElementById('mnav-chat')?.classList.add('active');
+    else if(tab === 'kanban') document.getElementById('mnav-kanban')?.classList.add('active');
+    else document.getElementById('mnav-dashboard')?.classList.add('active');
+}
+
+// Adicionar botão fechar na right panel (mobile)
+window.addEventListener('DOMContentLoaded', () => {
+    const rp = document.getElementById('erp-area');
+    if(rp) {
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'mobile-chat-back';
+        closeBtn.style.cssText = 'position:absolute;top:12px;right:12px;z-index:51;';
+        closeBtn.innerHTML = '<i data-lucide="x" style="width:20px;height:20px;"></i>';
+        closeBtn.onclick = mobileFecharInfo;
+        rp.style.position = 'relative';
+        rp.appendChild(closeBtn);
+        lucide.createIcons({root: closeBtn});
+    }
+});

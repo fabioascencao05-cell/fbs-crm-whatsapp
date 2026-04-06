@@ -38,7 +38,7 @@
     </aside>
 
     <!-- SEÇÃO: ATENDIMENTO / CHAT -->
-    <section id="sec-chat" style="display:flex;flex:1;overflow:hidden;">
+    <section id="sec-chat" style="display:flex;flex:1;overflow:hidden;position:relative;">
 
         <!-- COLUNA 1: Lista de Conversas -->
         <aside class="conv-panel">
@@ -68,6 +68,9 @@
             <div id="chat-active" class="hidden" style="flex:1;display:flex;flex-direction:column;height:100%;">
                 <header class="chat-header">
                     <div class="chat-header-left">
+                        <button onclick="mobileVoltarChat()" class="mobile-chat-back">
+                            <i data-lucide="arrow-left" style="width:20px;height:20px;"></i>
+                        </button>
                         <div class="avatar" id="chat-avatar"><span id="chat-initials">?</span></div>
                         <div class="info">
                             <h2>
@@ -92,8 +95,11 @@
                         <button id="btn-robo" onclick="alternarRobo()" class="btn-bot-pause">
                             <i data-lucide="bot" style="width:14px;height:14px;"></i> Pausar Bot
                         </button>
-                        <button onclick="excluirConversa()" class="btn-delete" title="Excluir Conversa">
+                        <button onclick="excluirConversa()" class="btn-delete" title="Excluir">
                             <i data-lucide="trash-2" style="width:15px;height:15px;"></i>
+                        </button>
+                        <button onclick="mobileAbrirInfo()" class="mobile-info-btn" title="Info">
+                            <i data-lucide="user" style="width:18px;height:18px;"></i>
                         </button>
                     </div>
                 </header>
@@ -231,6 +237,22 @@
     </div>
 
     <div id="toast-container" style="position:fixed;bottom:16px;right:16px;z-index:50;display:flex;flex-direction:column;gap:8px;pointer-events:none;"></div>
+
+    <!-- MOBILE BOTTOM NAV -->
+    <nav class="mobile-bottom-nav" id="mobile-nav">
+        <button onclick="mobileSwitchTab('chat')" class="mobile-nav-btn active" id="mnav-chat">
+            <i data-lucide="message-circle" style="width:20px;height:20px;"></i>
+            <span>Chat</span>
+        </button>
+        <button onclick="mobileSwitchTab('kanban')" class="mobile-nav-btn" id="mnav-kanban">
+            <i data-lucide="layout-grid" style="width:20px;height:20px;"></i>
+            <span>Pipeline</span>
+        </button>
+        <button onclick="mobileSwitchTab('dashboard')" class="mobile-nav-btn" id="mnav-dashboard">
+            <i data-lucide="bar-chart-3" style="width:20px;height:20px;"></i>
+            <span>Dashboard</span>
+        </button>
+    </nav>
 
     <script src="app.js"></script>
     <script>lucide.createIcons();</script>
