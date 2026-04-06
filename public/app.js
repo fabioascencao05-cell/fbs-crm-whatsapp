@@ -254,8 +254,31 @@ async function alternarRobo() {
         await fetch(`/api/conversas/${conversaAtual.id}/${acao}`, { method: 'POST' });
         conversaAtual.status_bot = !conversaAtual.status_bot;
         renderBotBtn();
-        carregarConversas(); // update dot
+        carregarConversas();
+        if (acao === 'ativar') {
+            showToast('Bot ativado! Natália enviou mensagem ao cliente.', 'success');
+            setTimeout(carregarMensagens, 1500);
+        } else {
+            showToast('Bot pausado.', 'info');
+        }
     } catch(e) {}
+}
+
+async function excluirConversa() {
+    if(!conversaAtual) return;
+    const confirma = confirm(`Tem certeza que quer EXCLUIR a conversa com ${conversaAtual.nome}?\n\nIsso apaga todas as mensagens e pedidos desta conversa.`);
+    if (!confirma) return;
+    try {
+        const res = await fetch(`/api/conversas/${conversaAtual.id}`, { method: 'DELETE' });
+        if (res.ok) {
+            showToast('Conversa excluída!', 'success');
+            conversaAtual = null;
+            document.getElementById('chat-empty').classList.remove('hidden');
+            document.getElementById('chat-active').classList.add('hidden');
+            document.getElementById('erp-area').classList.add('hidden');
+            carregarConversas(true);
+        } else { showToast('Erro ao excluir', 'error'); }
+    } catch(e) { showToast('Erro ao excluir', 'error'); }
 }
 
 async function carregarMensagens() {
@@ -392,9 +415,9 @@ function renderListaQuickReplies(forPopup) {
              `;
         }
         div.onclick = () => {
-            document.getElementById('input-msg').value = q.texto;
+            document.getElementById('input-msg').value = q.atalho;
             fecharQuickReply();
-            enviarMsg(true); // Envia automaticamente a quick reply
+            enviarMsg(true);
         };
         l.appendChild(div);
     });
