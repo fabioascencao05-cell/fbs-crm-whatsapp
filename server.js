@@ -688,37 +688,96 @@ app.post('/api/conversas/:id/agendar', async (req, res) => {
 
 app.post('/api/conversas/:id/followup', async (req, res) => {
     try {
-        const val = req.body.horas ? parseInt(req.body.horas) : null;
-        await prisma.conversa.update({ where: { id: req.params.id }, data: { lembrete_horas: val }});
+        const { horas, proximo_followup, template } = req.body;
+        const val = horas ? parseInt(horas) : null;
+        
+        // Atualiza a config da conversa
+        await prisma.conversa.update({ 
+            where: { id: req.params.id }, 
+            data: { lembrete_horas: val }
+        });
+
+        // Se tiver uma data específica, cria uma mensagem agendada
+        if (proximo_followup && template) {
+            await prisma.mensagem.create({
+                data: {
+                    conversaId: req.params.id,
+                    texto: template,
+                    origem: 'loja',
+                    agendado_para: new Date(proximo_followup),
+                    status_envio: 'Pendente'
+                }
+            });
+        }
+
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Loop Cron para Automações
-setInterval(async () => {
+// SINCRONIZAÇÃO TOTAL (Puxar conversas e fotos antigas)
+app.post('/api/sync', async (req, res) => {
     try {
-        const pendentes = await prisma.mensagem.findMany({ where: { status_envio: 'Pendente', agendado_para: { lte: new Date() } }, include: { conversa: true } });
-        for(let p of pendentes) {
-             const success = await enviarMensagemEvolution(p.conversa.telefone, p.texto);
-             await prisma.mensagem.update({ where: { id: p.id }, data: { status_envio: success ? 'Enviado' : 'Falha' } });
-             await prisma.conversa.update({ where: { id: p.conversa.id }, data: { ultima_mensagem: `(Agendado) ${p.texto}`, atualizado_em: new Date() } });
+        console.log('🔄 Iniciando Sincronização com Evolution API...');
+        const url = `${process.env.EVOLUTION_API_URL}/chat/getChatMetadata/${process.env.EVOLUTION_INSTANCE}`;
+        const response = await axios.get(url, { headers: { 'apikey': process.env.EVOLUTION_API_KEY } });
+        
+        const chats = response.data || [];
+        let count = 0;
+
+        for (const chat of chats) {
+            const remoteJid = chat.id || chat.remoteJid;
+            if (!remoteJid || remoteJid.includes('@g.us')) continue;
+
+            const name = chat.pushName || chat.name || 'Cliente Antigo';
+            const number = remoteJid.split('@')[0];
+            const profilePic = chat.profilePicUrl || null;
+
+            await prisma.conversa.upsert({
+                where: { id: remoteJid },
+                update: { profile_pic_url: profilePic },
+                create: {
+                    id: remoteJid,
+                    nome: name,
+                    telefone: number,
+                    profile_pic_url: profilePic,
+                    status_bot: true,
+                    status_kanban: "Novos",
+                    ultima_mensagem: "Conversa Sincronizada"
+                }
+            });
+            count++;
         }
 
-        const conversasComLembrete = await prisma.conversa.findMany({ where: { lembrete_horas: { not: null } } });
-        for(let c of conversasComLembrete) {
-            const ultGeral = await prisma.mensagem.findFirst({ where: { conversaId: c.id }, orderBy: { criado_em: 'desc' } });
-            if(ultGeral && ultGeral.origem === 'loja') {
-                 const hrAtras = (new Date() - ultGeral.criado_em) / 3600000;
-                 if(hrAtras >= c.lembrete_horas) {
-                      const fText = "Oi de novo! Passando pra saber se você ainda tem interesse no nosso orçamento! Posso separar sua demanda ou tem alguma dúvida? 😊";
-                      await enviarMensagemEvolution(c.telefone, fText);
-                      await prisma.mensagem.create({ data: { conversaId: c.id, texto: fText, origem: 'bot' } });
-                      await prisma.conversa.update({ where: { id: c.id }, data: { lembrete_horas: null, ultima_mensagem: fText }});
-                 }
-            }
+        res.json({ success: true, message: `${count} conversas sincronizadas!` });
+    } catch (err) {
+        console.error('❌ Erro na Sincronização:', err.message);
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Loop Cron para Automações (Reduzido para 30s)
+setInterval(async () => {
+    try {
+        const agora = new Date();
+        const pendentes = await prisma.mensagem.findMany({ 
+            where: { 
+                status_envio: 'Pendente', 
+                agendado_para: { lte: agora } 
+            }, 
+            include: { conversa: true } 
+        });
+
+        for(let p of pendentes) {
+             console.log(`⏰ Enviando agendado para ${p.conversa.telefone}: ${p.texto}`);
+             const success = await enviarMensagemEvolution(p.conversa.telefone, p.texto);
+             await prisma.mensagem.update({ where: { id: p.id }, data: { status_envio: success ? 'Enviado' : 'Falha' } });
+             await prisma.conversa.update({ 
+                where: { id: p.conversa.id }, 
+                data: { ultima_mensagem: `(Auto) ${p.texto}`, atualizado_em: new Date() } 
+             });
         }
     } catch(err) { console.error("Erro no cron:", err); }
-}, 60000);
+}, 30000);
 
 // Deixando regras de frontend ABAIXO exclusivas aqui:
 app.use(express.static(path.join(__dirname, 'public')));
