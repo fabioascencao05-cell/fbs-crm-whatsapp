@@ -515,6 +515,29 @@ app.post('/api/conversas/:id/kanban', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// Proxy de Mídia para contornar autenticação da Evolution API
+app.get('/api/proxy-media', async (req, res) => {
+    try {
+        const { url } = req.query;
+        if (!url || url === 'image_received' || url === 'audio_received') {
+            return res.status(400).send('URL de mídia inválida ou não encontrada');
+        }
+        
+        console.log('📡 Buscando mídia via Proxy:', url);
+        
+        const response = await axios.get(url, {
+            headers: { 'apikey': process.env.EVOLUTION_API_KEY },
+            responseType: 'arraybuffer'
+        });
+
+        res.set('Content-Type', response.headers['content-type']);
+        res.send(response.data);
+    } catch (err) {
+        console.error('❌ Erro no Proxy de Mídia:', err.message);
+        res.status(500).send('Erro ao carregar mídia');
+    }
+});
+
 // Tags Update
 app.post('/api/conversas/:id/tags', async (req, res) => {
     try {
