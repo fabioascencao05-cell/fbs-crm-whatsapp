@@ -11,6 +11,7 @@ model Conversa {
   id              String     @id
   nome            String
   telefone        String
+  profile_pic_url String?
   status_bot      Boolean    @default(true)
   ultima_mensagem String?
   

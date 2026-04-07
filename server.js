@@ -256,6 +256,7 @@ app.post('/api/webhook', async (req, res) => {
     }
 
     const pushName = messageData.pushName || 'Desconhecido';
+    const profilePic = messageData.profilePicUrl || null;
     const number = remoteJid.split('@')[0];
 
     // Extrair texto e mídia
@@ -269,20 +270,19 @@ app.post('/api/webhook', async (req, res) => {
     } else if (messageObj?.imageMessage) {
         msgText = messageObj.imageMessage.caption || '📷 Imagem'; 
         mediaType = 'image';
-        // Caso a API retorne a URL da midia (exemplo basico, varie dependendo da sua conv Evolution)
-        mediaUrl = messageData.message.imageMessage?.url || messageData.messageType || 'image_received';
+        mediaUrl = messageObj.imageMessage.url || 'image_received';
     } else if (messageObj?.audioMessage) {
         msgText = '🎵 Áudio Recebido';
         mediaType = 'audio';
-        mediaUrl = 'audio_received'; // Em um setup real, voce baixaria ou extrairia o base64 daqui
+        mediaUrl = messageObj.audioMessage.url || 'audio_received';
     } else if (messageObj?.videoMessage) {
         msgText = '🎥 Vídeo Recebido';
         mediaType = 'video';
-        mediaUrl = 'video_received';
+        mediaUrl = messageObj.videoMessage.url || 'video_received';
     } else if (messageObj?.documentMessage) {
         msgText = messageObj.documentMessage.fileName || '📄 Documento Recebido';
         mediaType = 'document';
-        mediaUrl = 'document_received';
+        mediaUrl = messageObj.documentMessage.url || 'document_received';
     } else {
          msgText = '📎 [Mídia/Outro Formato]';
     }
@@ -292,8 +292,23 @@ app.post('/api/webhook', async (req, res) => {
     try {
         const conversa = await prisma.conversa.upsert({
             where: { id: remoteJid },
-            update: { nome: pushName, ultima_mensagem: msgText, atualizado_em: new Date(), unreadCount: { increment: 1 } },
-            create: { id: remoteJid, nome: pushName, telefone: number, ultima_mensagem: msgText, status_bot: true, status_kanban: "Novos", unreadCount: 1 }
+            update: { 
+                nome: pushName, 
+                profile_pic_url: profilePic,
+                ultima_mensagem: msgText, 
+                atualizado_em: new Date(), 
+                unreadCount: { increment: 1 } 
+            },
+            create: { 
+                id: remoteJid, 
+                nome: pushName, 
+                telefone: number, 
+                profile_pic_url: profilePic,
+                ultima_mensagem: msgText, 
+                status_bot: true, 
+                status_kanban: "Novos", 
+                unreadCount: 1 
+            }
         });
 
         await prisma.mensagem.create({
