@@ -6,9 +6,11 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 const { PrismaClient } = require('@prisma/client');
 const cors = require('cors');
+const jwt = require('jsonwebtoken'); // Para manter você logado com segurança
 require('dotenv').config();
 
 const app = express();
+const JWT_SECRET = process.env.JWT_SECRET || 'fbs-camisetas-seguro-2024';
 const prisma = new PrismaClient();
 const upload = multer();
 
@@ -202,6 +204,18 @@ app.get('/api/respostas', async (req, res) => {
 
 app.post('/api/sync', async (req, res) => {
     res.json({ message: "Sincronização iniciada" });
+});
+
+app.post('/api/login', async (req, res) => {
+    const { email, senha } = req.body;
+    
+    // Login padrão para o Fabio (podemos mudar no banco depois)
+    if (email === 'admin@fbs.com' && senha === 'fbs2024') {
+        const token = jwt.sign({ user: 'Fabio' }, JWT_SECRET, { expiresIn: '7d' });
+        return res.json({ success: true, token });
+    }
+    
+    res.status(401).json({ error: 'E-mail ou senha incorretos' });
 });
 
 app.listen(3000, () => console.log('🚀 FBS CRM rodando na porta 3000'));
