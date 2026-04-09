@@ -18,6 +18,7 @@ model Conversa {
   // Phase 5 Fills
   status_kanban   String     @default("Novos") // Novos, Em Orçamento, Aguardando Arte/Aprovação, Em Produção, Finalizado
   tags            String?    // Ex: "Atacado,Urgente"
+  etiquetas       Etiqueta[] // Campo de relação obrigatório
   
   // Master Phase
   unreadCount     Int        @default(0)
