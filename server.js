@@ -343,8 +343,8 @@ app.post('/api/webhook', async (req, res) => {
 
         // ========== ACIONAR IA ==========
         if (!mediaType) {
-            console.log(`🤖 Acionando IA para a conversa ${chatId}...`);
-            processarIA(conversa.id, msgText);
+            console.log(`🤖 Acionando IA para a conversa ${remoteJid}...`);
+            processarIA(remoteJid, msgText);
         } else {
             console.log('📎 Mídia recebida, IA não acionada.');
         }
