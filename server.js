@@ -239,9 +239,7 @@ app.post('/api/webhook', async (req, res) => {
             data: { conversaId: remoteJid, texto: msgText, origem: 'cliente' }
         });
 
-        // REGRAS PARA ACIONAR IA (Natália)
-        // 1. Bot precisa estar ativo na conversa
-        // 2. Cliente PRECISA estar na coluna 'Novos' (Regra do Tráfego)
+        // Natália responde apenas se estiver em 'Novos'
         if (conversa.status_bot && conversa.status_kanban === 'Novos') {
             console.log(`🤖 Lead em 'Novos' detectado. Acionando Natália para ${remoteJid}`);
             processarIA(remoteJid, msgText);
@@ -301,17 +299,40 @@ app.post('/api/sync', async (req, res) => {
 
 app.post('/api/conversas/:id/etiquetas', async (req, res) => {
     const { id } = req.params;
-    const { etiquetaIds } = req.body; // Array de IDs das etiquetas
+    const { etiquetaIds } = req.body; 
     
     try {
         await prisma.conversa.update({
             where: { id },
             data: {
-                etiquetas: {
-                    set: etiquetaIds.map(id => ({ id }))
-                }
+                etiquetas: { set: etiquetaIds.map(eid => ({ id: eid })) }
             }
         });
+
+        // Verifica se alguma etiqueta nova tem follow-up configurado
+        const etiquetasFull = await prisma.etiqueta.findMany({
+            where: { id: { in: etiquetaIds } }
+        });
+
+        for (const et of etiquetasFull) {
+            if (et.followup_texto && et.followup_horas) {
+                const dataEnvio = new Date();
+                dataEnvio.setHours(dataEnvio.getHours() + et.followup_horas);
+
+                // agenda o envio na tabela Mensagem
+                await prisma.mensagem.create({
+                    data: {
+                        conversaId: id,
+                        texto: et.followup_texto,
+                        origem: 'bot',
+                        agendado_para: dataEnvio,
+                        status_envio: 'Pendente'
+                    }
+                });
+                console.log(`⏰ Agendado follow-up para ${id} em ${et.followup_horas}h (Etiqueta: ${et.nome})`);
+            }
+        }
+
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -331,9 +352,40 @@ app.post('/api/login', async (req, res) => {
 });
 
 // ==========================================
-// AUTOMAÇÃO: FOLLOW-UP AUTOMÁTICO (Todo dia às 09:00)
+// AUTOMAÇÃO: ENVIO DE AGENDADOS (A cada 5 minutos)
+// ==========================================
+cron.schedule('*/5 * * * *', async () => {
+    try {
+        const agora = new Date();
+        const mensagensPendentes = await prisma.mensagem.findMany({
+            where: {
+                status_envio: 'Pendente',
+                agendado_para: { lte: agora }
+            }
+        });
+
+        for (const msg of mensagensPendentes) {
+            console.log(`📤 Enviando agendado para ${msg.conversaId}...`);
+            await enviarMensagemEvolution(msg.conversaId.split('@')[0], msg.texto);
+            
+            await prisma.mensagem.update({
+                where: { id: msg.id },
+                data: { status_envio: 'Enviado' }
+            });
+
+            await prisma.conversa.update({
+                where: { id: msg.conversaId },
+                data: { ultima_mensagem: msg.texto, atualizado_em: new Date() }
+            });
+        }
+    } catch (err) { console.error('❌ Erro no Cron Agendados:', err.message); }
+});
+
+// ==========================================
+// AUTOMAÇÃO: FOLLOW-UP AUTOMÁTICO (Novos Leads 09:00)
 // ==========================================
 cron.schedule('0 9 * * *', async () => {
+    // ... logic for Novos leads remains checking the 'Novos' status_kanban
     console.log('🤖 Iniciando varredura de Follow-up Automático...');
     
     try {

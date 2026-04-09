@@ -71,6 +71,16 @@ model RespostaRapida {
   criado_em  DateTime @default(now())
 }
 
+model Etiqueta {
+  id              Int      @id @default(autoincrement())
+  nome            String   @unique
+  cor             String
+  followup_texto  String?  // nova: mensagem pré-pronta
+  followup_horas  Int?    // nova: tempo em horas para envio
+  conversas       Conversa[]
+  criado_em       DateTime @default(now())
+}
+
 model Usuario {
   id        Int      @id @default(autoincrement())
   email     String   @unique
