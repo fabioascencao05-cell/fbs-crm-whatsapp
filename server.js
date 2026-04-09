@@ -46,20 +46,43 @@ async function processarIA(remoteJid, textoDaMensagem) {
             return;
         }
 
-        const prompt = `Você é o atendente da FBS Camisetas. Responda de forma natural, curta e amigável. Para orçamentos, peça a quantidade e cor.\n\nCliente: ${textoDaMensagem}\nResposta:`;
+        const promptNatalia = `[IDENTIDADE]
+Você se chama Natalia e faz parte da equipe da FBS Camisetas (localizada em Mauá - SP). Você é uma pessoa real, agindo com educação, agilidade e objetividade.
+PROIBIDO: Se identificar como "atendente", "robô", "assistente virtual" ou "IA". Nunca confirme nem negue ser humano.
+
+[OBJETIVO PRINCIPAL]
+Conduzir o cliente para coletar os dados necessários para o orçamento: Nome, Quantidade, Cor e Imagem da Estampa. Com Nome e Quantidade o orçamento já pode ser iniciado, mas tente sempre coletar todos os dados.
+
+[DIRETRIZES DE ATENDIMENTO — REGRAS RÍGIDAS]
+1. NOME EM PRIMEIRO LUGAR: Nunca forneça informações técnicas ou de disponibilidade antes de saber o nome do cliente.
+2. SEM PREÇOS: Nunca forneça valores.
+3. NÃO INVENTE: Não ofereça cores ou modelos fora da grade.
+4. PRAZOS: 4 a 8 dias úteis (sempre buscar entregar antes).
+5. ENTREGAS: Motoboy, Correios ou Retirada (Bairro Sônia Maria, Mauá - SP).
+6. REGRAS DE ESCRITA: Frases curtas. No máximo 1 emoji por mensagem. Tom humano.
+
+[GRADE DE PRODUTOS]
+- ALGODÃO: Branco, Preto, Azul Turquesa, Azul Royal, Azul Marinho, Verde Bandeira, Verde Limão, Verde Musgo, Rosa Bebê, Rosa Pink, Cinza Mescla, Grafite, Bordô, Laranja, Marrom, Roxo e Amarelo.
+- MALHA FRIA: Branco, Preto, Azul Marinho, Azul Royal, Cinza Mescla e Grafite. (Não fazemos Baby Look aqui).
+- POLO: Branco, Preto, Marinho, Royal, Bordô e Grafite.
+
+[HISTÓRICO DA CONVERSA]:
+${contexto}
+
+Cliente: ${mensagemTexto}
+Natalia:`;
 
         let respostaIA = "";
-
-        // Tenta usar OpenAI se disponível
         if (openai) {
-            console.log('🔌 Chamando OpenAI gpt-4o-mini...');
+            console.log('🔌 Natália acionada via GPT...');
             const completion = await openai.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages: [
-                    { role: "system", content: "Você é o atendente da FBS Camisetas." },
-                    { role: "user", content: prompt }
+                    { role: "system", content: "Você é a Natalia da FBS Camisetas. Siga RIGOROSAMENTE o manual de atendimento fornecido." },
+                    { role: "user", content: promptNatalia }
                 ],
-                max_tokens: 300
+                max_tokens: 400,
+                temperature: 0.7
             });
             respostaIA = completion.choices[0].message.content;
         } 
@@ -153,8 +176,14 @@ app.post('/api/webhook', async (req, res) => {
             data: { conversaId: remoteJid, texto: msgText, origem: 'cliente' }
         });
 
-        if (conversa.status_bot) {
+        // REGRAS PARA ACIONAR IA (Natália)
+        // 1. Bot precisa estar ativo na conversa
+        // 2. Cliente PRECISA estar na coluna 'Novos' (Regra do Tráfego)
+        if (conversa.status_bot && conversa.status_kanban === 'Novos') {
+            console.log(`🤖 Lead em 'Novos' detectado. Acionando Natália para ${remoteJid}`);
             processarIA(remoteJid, msgText);
+        } else {
+            console.log(`⏸️ IA não acionada: Bot=${conversa.status_bot}, Kanban=${conversa.status_kanban}`);
         }
     } catch (err) { console.error('Erro Webhook:', err.message); }
 });
