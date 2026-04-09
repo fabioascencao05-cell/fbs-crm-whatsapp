@@ -437,6 +437,17 @@ app.get('/api/conversas/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.delete('/api/conversas/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        // Deletar mensagens primeiro por causa da chave estrangeira
+        await prisma.mensagem.deleteMany({ where: { conversaId: id } });
+        await prisma.pedido.deleteMany({ where: { conversaId: id } });
+        await prisma.conversa.delete({ where: { id } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/conversas/:id/pausar', async (req, res) => {
     try {
         await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: false } });
