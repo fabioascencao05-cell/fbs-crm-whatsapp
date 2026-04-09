@@ -6,7 +6,8 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { OpenAI } = require("openai");
 const { PrismaClient } = require('@prisma/client');
 const cors = require('cors');
-const jwt = require('jsonwebtoken'); // Para manter você logado com segurança
+const jwt = require('jsonwebtoken'); 
+const cron = require('node-cron');
 require('dotenv').config();
 
 const app = express();
@@ -216,6 +217,61 @@ app.post('/api/login', async (req, res) => {
     }
     
     res.status(401).json({ error: 'E-mail ou senha incorretos' });
+});
+
+// ==========================================
+// AUTOMAÇÃO: FOLLOW-UP AUTOMÁTICO (Todo dia às 09:00)
+// ==========================================
+cron.schedule('0 9 * * *', async () => {
+    console.log('🤖 Iniciando varredura de Follow-up Automático...');
+    
+    try {
+        const ontem = new Date();
+        ontem.setDate(ontem.getDate() - 1);
+
+        // Busca conversas na coluna 'Novos' que não foram atualizadas há 24h
+        const leadsParados = await prisma.conversa.findMany({
+            where: {
+                status_kanban: 'Novos',
+                atualizado_em: { lte: ontem },
+                status_bot: true
+            },
+            include: {
+                mensagens: {
+                    orderBy: { criado_em: 'desc' },
+                    take: 1
+                }
+            }
+        });
+
+        console.log(`🔍 Encontrados ${leadsParados.length} leads para follow-up.`);
+
+        for (const lead of leadsParados) {
+            const ultimaMsg = lead.mensagens[0];
+            
+            // Só manda se a última mensagem NÃO foi do cliente
+            if (ultimaMsg && ultimaMsg.origem !== 'cliente') {
+                const msgFollowUp = `Oi ${lead.nome}! Passando só pra saber se você recebeu minha última mensagem. Ficou alguma dúvida sobre os modelos de camisetas? 😊`;
+                
+                await enviarMensagemEvolution(lead.telefone, msgFollowUp);
+                
+                await prisma.mensagem.create({
+                    data: { conversaId: lead.id, texto: msgFollowUp, origem: 'bot' }
+                });
+
+                await prisma.conversa.update({
+                    where: { id: lead.id },
+                    data: { atualizado_em: new Date() }
+                });
+                
+                console.log(`✅ Follow-up enviado para: ${lead.nome}`);
+            }
+        }
+    } catch (err) {
+        console.error('❌ Erro no Follow-up Automático:', err.message);
+    }
+}, {
+    timezone: "America/Sao_Paulo"
 });
 
 app.listen(3000, () => console.log('🚀 FBS CRM rodando na porta 3000'));
