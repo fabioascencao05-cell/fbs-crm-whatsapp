@@ -142,6 +142,69 @@ const enviarMensagemEvolution = async (number, text) => {
 };
 
 // ==========================================
+// ROTAS API
+// ==========================================
+
+app.get('/api/conversas', async (req, res) => {
+    try {
+        const conversas = await prisma.conversa.findMany({
+            include: { etiquetas: true },
+            orderBy: { atualizado_em: 'desc' }
+        });
+        res.json(conversas);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/conversas/:id', async (req, res) => {
+    try {
+        const conversa = await prisma.conversa.findUnique({
+            where: { id: req.params.id },
+            include: { 
+                mensagens: { orderBy: { criado_em: 'asc' } },
+                etiquetas: true
+            }
+        });
+        res.json({ conversa, mensagens: conversa.mensagens, pedidos: [] });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/conversas/:id/kanban', async (req, res) => {
+    try {
+        const conversa = await prisma.conversa.update({
+            where: { id: req.params.id },
+            data: { status_kanban: req.body.status, atualizado_em: new Date() }
+        });
+        res.json(conversa);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/conversas/:id/ativar', async (req, res) => {
+    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: true } });
+    res.json({ success: true });
+});
+
+app.post('/api/conversas/:id/pausar', async (req, res) => {
+    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: false } });
+    res.json({ success: true });
+});
+
+app.post('/api/conversas/:id/enviar', async (req, res) => {
+    const { id } = req.params;
+    const { texto } = req.body;
+    try {
+        await enviarMensagemEvolution(id.split('@')[0], texto);
+        const msg = await prisma.mensagem.create({
+            data: { conversaId: id, texto, origem: 'loja' }
+        });
+        await prisma.conversa.update({
+            where: { id },
+            data: { ultima_mensagem: texto, atualizado_em: new Date(), status_bot: false }
+        });
+        res.json(msg);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ==========================================
 // WEBHOOK
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
@@ -234,6 +297,25 @@ app.get('/api/respostas', async (req, res) => {
 
 app.post('/api/sync', async (req, res) => {
     res.json({ message: "Sincronização iniciada" });
+});
+
+app.post('/api/conversas/:id/etiquetas', async (req, res) => {
+    const { id } = req.params;
+    const { etiquetaIds } = req.body; // Array de IDs das etiquetas
+    
+    try {
+        await prisma.conversa.update({
+            where: { id },
+            data: {
+                etiquetas: {
+                    set: etiquetaIds.map(id => ({ id }))
+                }
+            }
+        });
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 app.post('/api/login', async (req, res) => {
