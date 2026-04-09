@@ -1,22 +1,29 @@
 {
-  "name": "FBS CRM",
-  "short_name": "FBS CRM",
-  "description": "CRM WhatsApp - FBS Camisetas",
-  "start_url": "/",
-  "display": "standalone",
-  "background_color": "#1a1a2e",
-  "theme_color": "#e83e6c",
-  "orientation": "portrait-primary",
-  "icons": [
+  "manifest_version": 3,
+  "name": "FBS CRM - WhatsApp Extension",
+  "version": "2.1.0",
+  "description": "CRM Integrado para WhatsApp Web (FBS Camisetas)",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://web.whatsapp.com/*",
+    "https://crmwhats.fbssistema.cloud/*"
+  ],
+  "content_scripts": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["assets/content.js"],
+      "css": ["assets/index.css"]
     }
-  ]
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*"],
+      "matches": ["https://web.whatsapp.com/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "index.html"
+  }
 }
