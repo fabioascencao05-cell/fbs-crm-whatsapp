@@ -52,11 +52,21 @@ async function processarIA(remoteJid, textoDaMensagem) {
     console.log(`🤖 Iniciando resposta via GPT para: ${remoteJid}`);
     
     try {
-        const conversa = await prisma.conversa.findUnique({ where: { id: remoteJid } });
+        const conversa = await prisma.conversa.findUnique({ 
+            where: { id: remoteJid },
+            include: { mensagens: { orderBy: { criado_em: 'desc' }, take: 10 } }
+        });
+
         if (!conversa || !conversa.status_bot) {
             console.log('🛑 Bot ignorado para esta conversa.');
             return;
         }
+
+        // Constrói o contexto do histórico
+        const contexto = conversa.mensagens
+            .reverse()
+            .map(m => `${m.origem === 'cliente' ? 'Cliente' : 'Natalia'}: ${m.texto}`)
+            .join('\n');
 
         const promptNatalia = `[IDENTIDADE]
 Você se chama Natalia e faz parte da equipe da FBS Camisetas (localizada em Mauá - SP). Você é uma pessoa real, agindo com educação, agilidade e objetividade.
@@ -81,7 +91,7 @@ Conduzir o cliente para coletar os dados necessários para o orçamento: Nome, Q
 [HISTÓRICO DA CONVERSA]:
 ${contexto}
 
-Cliente: ${mensagemTexto}
+Cliente: ${textoDaMensagem}
 Natalia:`;
 
         let respostaIA = "";
@@ -102,7 +112,7 @@ Natalia:`;
         else if (process.env.GEMINI_API_KEY) {
             console.log('🔌 Usando Gemini como fallback...');
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const result = await model.generateContent(prompt);
+            const result = await model.generateContent(promptNatalia);
             respostaIA = result.response.text();
         }
 
@@ -293,33 +303,8 @@ app.post('/api/webhook', async (req, res) => {
     } catch (err) { console.error('Erro Webhook:', err.message); }
 });
 
-// Outras rotas (CRUD, Kanban, etc) continuam abaixo...
-app.get('/api/conversas', async (req, res) => {
-    const conversas = await prisma.conversa.findMany({ orderBy: { atualizado_em: 'desc' } });
-    res.json(conversas);
-});
+// Rotas de utilidades e proxy seguem abaixo...
 
-app.get('/api/conversas/:id', async (req, res) => {
-    const conversa = await prisma.conversa.findUnique({ where: { id: req.params.id } });
-    const mensagens = await prisma.mensagem.findMany({ where: { conversaId: req.params.id }, orderBy: { criado_em: 'asc' } });
-    const pedidos = await prisma.pedido.findMany({ where: { conversaId: req.params.id } });
-    res.json({ conversa, mensagens, pedidos });
-});
-
-app.post('/api/conversas/:id/pausar', async (req, res) => {
-    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: false } });
-    res.json({ success: true });
-});
-
-app.post('/api/conversas/:id/ativar', async (req, res) => {
-    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_bot: true } });
-    res.json({ success: true });
-});
-
-app.post('/api/conversas/:id/kanban', async (req, res) => {
-    await prisma.conversa.update({ where: { id: req.params.id }, data: { status_kanban: req.body.status } });
-    res.json({ success: true });
-});
 
 app.get('/api/proxy-media', async (req, res) => {
     try {
@@ -332,13 +317,70 @@ app.get('/api/proxy-media', async (req, res) => {
     } catch (e) { res.status(500).send('Erro Proxy'); }
 });
 
-app.get('/api/respostas', async (req, res) => {
-    const respostas = await prisma.respostaRapida.findMany();
-    res.json(respostas);
+app.post('/api/respostas', async (req, res) => {
+    try {
+        const { atalho, texto } = req.body;
+        const resposta = await prisma.respostaRapida.create({
+            data: { atalho, texto }
+        });
+        res.json(resposta);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/dashboard/stats', async (req, res) => {
+    try {
+        const totalLeads = await prisma.conversa.count();
+        const faturamento = await prisma.conversa.aggregate({ _sum: { valor_conversa: true } });
+        const novos = await prisma.conversa.count({ where: { status_kanban: 'Novos' } });
+        
+        res.json({
+            totalLeads,
+            faturamentoTotal: faturamento._sum.valor_conversa || 0,
+            novosLeads: novos,
+            success: true
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/sync', async (req, res) => {
-    res.json({ message: "Sincronização iniciada" });
+    console.log('🔄 Iniciando sincronização via Evolution API...');
+    try {
+        // Busca contatos da Evolution API
+        const url = `${process.env.EVOLUTION_API_URL}/contact/findContacts/${process.env.EVOLUTION_INSTANCE}`;
+        const response = await axios.get(url, { headers: { 'apikey': process.env.EVOLUTION_API_KEY } });
+        const contatos = response.data;
+
+        let syncedCount = 0;
+        if (Array.isArray(contatos)) {
+            for (const c of contatos) {
+                if (!c.id) continue;
+                const remoteJid = c.id;
+                const number = remoteJid.split('@')[0];
+                
+                await prisma.conversa.upsert({
+                    where: { id: remoteJid },
+                    update: { 
+                        nome: c.pushName || c.name || number,
+                        profile_pic_url: c.profilePictureUrl || null
+                    },
+                    create: {
+                        id: remoteJid,
+                        nome: c.pushName || c.name || number,
+                        telefone: number,
+                        profile_pic_url: c.profilePictureUrl || null,
+                        status_bot: true,
+                        status_kanban: "Novos"
+                    }
+                });
+                syncedCount++;
+            }
+        }
+
+        res.json({ message: `Sincronização concluída! ${syncedCount} contatos sincronizados.` });
+    } catch (err) {
+        console.error('Erro na sincronização:', err.message);
+        res.status(500).json({ error: 'Falha ao sincronizar com WhatsApp: ' + err.message });
+    }
 });
 
 app.post('/api/conversas/:id/etiquetas', async (req, res) => {
@@ -466,19 +508,12 @@ cron.schedule('0 9 * * *', async () => {
                     data: { conversaId: lead.id, texto: msgFollowUp, origem: 'bot' }
                 });
 
-                // Se houver uma "tag_automatica" definida, atualizamos o status do cliente
-                if (agendamento.tag_automatica) {
-                    await prisma.conversa.update({
-                        where: { id: agendamento.conversaId },
-                        data: { status_kanban: agendamento.tag_automatica }
-                    });
-                }
-
-                await prisma.agendamentoFollowUp.update({
-                    where: { id: agendamento.id },
-                    data: { status_envio: 'Enviado' }
+                // Atualiza o status do cliente após o envio automático
+                await prisma.conversa.update({
+                    where: { id: lead.id },
+                    data: { atualizado_em: new Date() }
                 });
-                console.log(`✅ Follow-up enviado para ${agendamento.conversaId}`);
+                console.log(`✅ Follow-up enviado para: ${lead.nome}`);
 
                 await prisma.conversa.update({
                     where: { id: lead.id },
@@ -493,6 +528,16 @@ cron.schedule('0 9 * * *', async () => {
     }
 }, {
     timezone: "America/Sao_Paulo"
+});
+
+// SPA support: Fallback para o index.html em qualquer rota não-API
+const path = require('path');
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    } else {
+        res.status(404).json({ error: 'Endpoint não encontrado' });
+    }
 });
 
 app.listen(3000, () => console.log('🚀 FBS CRM rodando na porta 3000'));
