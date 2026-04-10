@@ -18,7 +18,11 @@ const upload = multer();
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static('public'));
+
+// Escolhe a pasta certa do painel construído
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'cloned_frontend/dist')));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Configurações de IA
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "no_key");
@@ -153,17 +157,13 @@ PASSO 2 — Coletar nesta ordem:
 - Modelo e tipo de camiseta
 - Imagem/Logo (OPCIONAL): "Você já tem a imagem da estampa? Se tiver, pode enviar por aqui. Se não tiver, sem problema!"
 
-PASSO 3 — FINALIZAÇÃO OBRIGATÓRIA:
-Assim que tiver Nome + Quantidade + Cor, INDEPENDENTE DA IMAGEM, faça o handoff IMEDIATAMENTE:
-"Perfeito, [Nome]! Já anotei tudo aqui:
-📦 Quantidade: [X]
-🎨 Cor: [X]
-Vou encaminhar agora pro setor de orçamentos e em breve eles te chamam com os valores e prazo certinhos. Só aguardar um pouquinho! 😊"
-PARE. Não faça mais nenhuma pergunta. Não espere a imagem para finalizar.
+PASSO 3 — FINALIZAÇÃO IMEDIATA:
+Mal tenha o Nome, a Quantidade e a Cor, pare de perguntar e diga exatamente:
+"Perfeito, [Nome]! Já anotei tudo aqui e vou encaminhar agora pro setor de orçamentos. Em breve eles te chamam com os valores certinhos. Só aguardar um pouquinho! 😊"
+Fim da coleta. Não faça mais perguntas.
 
-[REGRA ABSOLUTA DE FINALIZAÇÃO]
-Nome + Quantidade + Cor = HANDOFF IMEDIATO. A imagem é OPCIONAL e NUNCA deve travar o handoff.
-Após o handoff, se o cliente mandar mensagem, responda apenas:
+[REGRA DE OURO]
+Se o cliente mandar mensagem após o handoff, responda apenas: 
 "Já encaminhei seus dados pro orçamento! Em breve nossa equipe entra em contato. 😊"
 
 [LOCALIZAÇÃO E ENTREGA]
