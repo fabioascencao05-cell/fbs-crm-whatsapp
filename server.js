@@ -22,6 +22,18 @@ app.use(express.static('public'));
 
 // Configurações de IA
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "no_key");
+
+// ==========================================
+// ADMIN: MIGRAR TUDO PARA NOVOS
+// ==========================================
+app.post('/api/admin/migrate-all', async (req, res) => {
+    try {
+        const result = await prisma.conversa.updateMany({
+            data: { status_kanban: 'Novos', status_bot: true }
+        });
+        res.json({ message: `${result.count} contatos movidos para Novos e IA ativada.` });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 // Instancia OpenAI apenas se a chave existir para evitar Erro Crítico
 let openai = null;
 if (process.env.OPENAI_API_KEY) {
@@ -453,6 +465,20 @@ cron.schedule('0 9 * * *', async () => {
                 await prisma.mensagem.create({
                     data: { conversaId: lead.id, texto: msgFollowUp, origem: 'bot' }
                 });
+
+                // Se houver uma "tag_automatica" definida, atualizamos o status do cliente
+                if (agendamento.tag_automatica) {
+                    await prisma.conversa.update({
+                        where: { id: agendamento.conversaId },
+                        data: { status_kanban: agendamento.tag_automatica }
+                    });
+                }
+
+                await prisma.agendamentoFollowUp.update({
+                    where: { id: agendamento.id },
+                    data: { status_envio: 'Enviado' }
+                });
+                console.log(`✅ Follow-up enviado para ${agendamento.conversaId}`);
 
                 await prisma.conversa.update({
                     where: { id: lead.id },

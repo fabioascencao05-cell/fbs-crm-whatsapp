@@ -28,7 +28,6 @@ model Conversa {
   criado_em       DateTime   @default(now())
   atualizado_em   DateTime   @updatedAt
   mensagens       Mensagem[]
-  pedidos         Pedido[]
 }
 
 model Mensagem {
@@ -47,21 +46,6 @@ model Mensagem {
   
   origem     String   // "cliente" ou "bot" ou "loja"
   criado_em  DateTime @default(now())
-}
-
-model Pedido {
-  id             String   @id @default(uuid())
-  conversaId     String
-  conversa       Conversa @relation(fields: [conversaId], references: [id])
-  quantidade     Int      @default(1)
-  tamanho        String?  // P, M, G, GG
-  cor            String?
-  local_estampa  String?
-  valor_total    Float    @default(0)
-  sinal_pago     Float    @default(0)
-  saldo_devedor  Float    @default(0)
-  status         String   @default("Pendente")
-  criado_em      DateTime @default(now())
 }
 
 model RespostaRapida {

@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@google/generative-ai": "latest",
-    "@prisma/client": "^5.12.1",
+    "@prisma/client": "^5.22.0",
     "axios": "^1.6.8",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
