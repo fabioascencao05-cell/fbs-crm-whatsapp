@@ -440,27 +440,28 @@ app.get('/api/dashboard/stats', async (req, res) => {
 });
 
 app.post('/api/conversas/delete', async (req, res) => {
-    const { id } = req.body; // Recebe o ID do corpo da requisição
+    const { id } = req.body;
     
     if (!id) return res.status(400).json({ error: "ID não fornecido" });
     
-    console.log(`🗑️ Tentando excluir conversa ID via POST: ${id}`);
+    console.log(`🗑️ Modo Nuclear: Tentando excluir conversa ID: ${id}`);
     
     try {
-        // 1. Desconecta etiquetas via SQL direto (evita bug do Prisma no Many-to-Many)
-        await prisma.$executeRawUnsafe(
-            `DELETE FROM "_ConversaToEtiqueta" WHERE "A" = $1`, id
-        );
+        // 1. Desvincula etiquetas de forma segura via Prisma API
+        await prisma.conversa.update({
+            where: { id },
+            data: { etiquetas: { set: [] } }
+        });
 
-        // 2. Apaga mensagens
+        // 2. Apaga todas as mensagens (incluindo as agendadas)
         await prisma.mensagem.deleteMany({ where: { conversaId: id } });
 
-        // 3. Apaga a conversa
+        // 3. Apaga o lead definitivamente
         await prisma.conversa.delete({ where: { id } });
 
         res.json({ success: true, message: 'Conversa excluída com sucesso' });
     } catch (err) {
-        console.error('❌ Erro ao excluir conversa:', err.message);
+        console.error('❌ Erro Fatal ao excluir conversa:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
