@@ -1,0 +1,108 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@layer base {
+  :root {
+    /* WhatsApp Dark Theme */
+    --background: 199 35% 11%;
+    --foreground: 200 20% 93%;
+
+    --card: 200 25% 14%;
+    --card-foreground: 200 20% 93%;
+
+    --popover: 200 25% 14%;
+    --popover-foreground: 200 20% 93%;
+
+    --primary: 152 69% 49%;
+    --primary-foreground: 199 35% 8%;
+
+    --secondary: 200 20% 18%;
+    --secondary-foreground: 200 15% 80%;
+
+    --muted: 200 15% 22%;
+    --muted-foreground: 200 10% 56%;
+
+    --accent: 152 69% 49%;
+    --accent-foreground: 199 35% 8%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 152 69% 49%;
+    --success-foreground: 199 35% 8%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+
+    --info: 199 89% 65%;
+    --info-foreground: 0 0% 100%;
+
+    --nav: 199 40% 8%;
+    --nav-foreground: 200 10% 56%;
+    --nav-active: 152 69% 49%;
+
+    --bubble-client: 200 25% 17%;
+    --bubble-bot: 152 25% 18%;
+    --bubble-store: 199 30% 20%;
+
+    --chat-bg: 199 35% 9%;
+
+    --border: 200 15% 24%;
+    --input: 200 15% 24%;
+    --ring: 152 69% 49%;
+    --radius: 0.625rem;
+
+    --sidebar-background: 199 40% 8%;
+    --sidebar-foreground: 200 10% 56%;
+    --sidebar-primary: 152 69% 49%;
+    --sidebar-primary-foreground: 199 35% 8%;
+    --sidebar-accent: 200 25% 15%;
+    --sidebar-accent-foreground: 200 20% 93%;
+    --sidebar-border: 200 15% 18%;
+    --sidebar-ring: 152 69% 49%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior: none;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.2);
+    border-radius: 20px;
+  }
+  .chat-pattern {
+    background-color: hsl(var(--chat-bg));
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2325D366' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .touch-active:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+}

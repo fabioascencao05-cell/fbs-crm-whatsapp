@@ -1,0 +1,396 @@
+/* FBS CRM - Injected styles for WhatsApp Web */
+#fbs-crm-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 99999;
+  pointer-events: none;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+#fbs-crm-root * {
+  box-sizing: border-box;
+}
+
+#fbs-crm-root > * {
+  pointer-events: auto;
+}
+
+/* Side Nav */
+.fbs-sidenav {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 56px;
+  height: 100vh;
+  background: #111b21;
+  border-right: 1px solid #3b4a54;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 0;
+  gap: 4px;
+  z-index: 100000;
+  pointer-events: auto;
+}
+
+.fbs-sidenav-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #8696a0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.fbs-sidenav-btn:hover {
+  background: #202c33;
+  color: #e9edef;
+}
+
+.fbs-sidenav-btn.active {
+  background: #25D366;
+  color: #111b21;
+}
+
+.fbs-sidenav-logo {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #25D366;
+  color: #111b21;
+  font-weight: 800;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.fbs-sidenav-spacer {
+  flex: 1;
+}
+
+/* Contact Panel */
+.fbs-contact-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  width: 340px;
+  height: 100vh;
+  background: #111b21;
+  border-left: 1px solid #3b4a54;
+  z-index: 100000;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.fbs-contact-header {
+  padding: 16px;
+  border-bottom: 1px solid #202c33;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fbs-contact-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #202c33;
+  color: #25D366;
+  font-weight: 700;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fbs-contact-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e9edef;
+}
+
+.fbs-contact-phone {
+  font-size: 12px;
+  color: #8696a0;
+}
+
+.fbs-contact-section {
+  padding: 16px;
+  border-bottom: 1px solid #202c33;
+}
+
+.fbs-contact-label {
+  font-size: 11px;
+  color: #8696a0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.fbs-contact-input {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #3b4a54;
+  background: #2a3942;
+  color: #e9edef;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.fbs-contact-input:focus {
+  border-color: #25D366;
+}
+
+.fbs-contact-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #3b4a54;
+  background: #2a3942;
+  color: #e9edef;
+  font-size: 13px;
+  outline: none;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  transition: border-color 0.2s;
+}
+
+.fbs-contact-textarea:focus {
+  border-color: #25D366;
+}
+
+.fbs-tag-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s;
+}
+
+.fbs-tag-badge.selected {
+  border-color: currentColor;
+}
+
+.fbs-tag-badge:hover {
+  filter: brightness(1.15);
+}
+
+/* Kanban Board */
+.fbs-kanban-overlay {
+  position: fixed;
+  left: 56px;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  background: #111b21;
+  z-index: 99998;
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.fbs-kanban-header {
+  padding: 16px 24px;
+  border-bottom: 1px solid #202c33;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fbs-kanban-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #e9edef;
+}
+
+.fbs-kanban-subtitle {
+  font-size: 12px;
+  color: #8696a0;
+}
+
+.fbs-kanban-columns {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  padding: 20px 24px;
+  overflow-x: auto;
+}
+
+.fbs-kanban-column {
+  min-width: 280px;
+  max-width: 320px;
+  flex: 1;
+  background: #202c33;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fbs-kanban-col-header {
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2a3942;
+}
+
+.fbs-kanban-col-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #e9edef;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fbs-kanban-col-count {
+  background: #2a3942;
+  color: #8696a0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+.fbs-kanban-col-accent {
+  width: 4px;
+  height: 16px;
+  border-radius: 2px;
+}
+
+.fbs-kanban-col-body {
+  flex: 1;
+  padding: 12px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fbs-kanban-card {
+  background: #2a3942;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.fbs-kanban-card:hover {
+  border-color: #3b4a54;
+  transform: translateY(-1px);
+}
+
+.fbs-kanban-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.fbs-kanban-card-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #111b21;
+  color: #25D366;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.fbs-kanban-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e9edef;
+}
+
+.fbs-kanban-card-msg {
+  font-size: 11px;
+  color: #8696a0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fbs-kanban-card-tags {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.fbs-kanban-card-tag {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+}
+
+/* Chat Toolbar */
+.fbs-chat-toolbar {
+  position: fixed;
+  bottom: 62px;
+  left: 56px;
+  right: 0;
+  height: 40px;
+  background: #202c33;
+  border-top: 1px solid #3b4a54;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 4px;
+  z-index: 99997;
+  pointer-events: auto;
+}
+
+.fbs-toolbar-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #8696a0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.fbs-toolbar-btn:hover {
+  background: #2a3942;
+  color: #25D366;
+}
+
+.fbs-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: #3b4a54;
+  margin: 0 4px;
+}

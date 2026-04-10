@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "FBS CRM - WhatsApp Web",
+  "version": "1.0.0",
+  "description": "CRM integrado ao WhatsApp Web para FBS Camisetas",
+  "permissions": ["activeTab", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["*://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

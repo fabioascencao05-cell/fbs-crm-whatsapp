@@ -1,0 +1,635 @@
+import { useState, useEffect, useRef } from 'react';
+import { Settings, Zap, FileText, Plus, Save, Trash2, Edit2, X, Check, MessageSquare, Tag, ImageIcon, Upload } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { fetchRespostas, salvarResposta } from '@/services/api';
+import type { RespostaRapida } from '@/types/crm';
+import { useEtiquetas } from '@/contexts/EtiquetasContext';
+import { useLogo } from '@/contexts/LogoContext';
+
+interface Template {
+  id: string;
+  nome: string;
+  categoria: string;
+  texto: string;
+}
+
+const mockTemplates: Template[] = [
+  { id: '1', nome: 'Boas-vindas', categoria: 'Geral', texto: 'Olá {{nome}}! Bem-vindo à FBS Camisetas! 👕 Como posso ajudar você hoje?' },
+  { id: '2', nome: 'Orçamento', categoria: 'Vendas', texto: 'Oi {{nome}}, segue o orçamento solicitado:\n\n📦 Quantidade: {{qtd}}\n👕 Modelo: {{modelo}}\n💰 Valor: {{valor}}\n\nAguardo sua aprovação!' },
+  { id: '3', nome: 'Prazo de entrega', categoria: 'Produção', texto: 'Olá {{nome}}, informamos que seu pedido {{pedido}} tem previsão de entrega para {{data}}. Qualquer dúvida estamos à disposição!' },
+  { id: '4', nome: 'Pagamento PIX', categoria: 'Financeiro', texto: 'Segue nossa chave PIX para pagamento:\n\n🏦 Chave: fbs@camisetas.com\n💰 Valor: {{valor}}\n\nApós o pagamento, envie o comprovante aqui.' },
+  { id: '5', nome: 'Pedido pronto', categoria: 'Produção', texto: 'Ótima notícia, {{nome}}! 🎉 Seu pedido {{pedido}} está pronto! Podemos combinar a entrega ou retirada. O que prefere?' },
+];
+
+const categorias = ['Todos', 'Geral', 'Vendas', 'Produção', 'Financeiro'];
+
+const PRESET_COLORS = [
+  'hsl(262 83% 58%)',
+  'hsl(199 89% 48%)',
+  'hsl(142 71% 45%)',
+  'hsl(38 92% 50%)',
+  'hsl(0 84% 60%)',
+  'hsl(330 81% 60%)',
+  'hsl(25 95% 53%)',
+  'hsl(200 18% 46%)',
+];
+
+export default function SettingsPage() {
+  const [tab, setTab] = useState<'respostas' | 'templates' | 'etiquetas' | 'geral'>('respostas');
+  const { logoUrl, setLogoUrl } = useLogo();
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const [respostas, setRespostas] = useState<RespostaRapida[]>([]);
+  const [templates, setTemplates] = useState<Template[]>(mockTemplates);
+  const [catFilter, setCatFilter] = useState('Todos');
+
+  // Etiquetas from shared context
+  const { etiquetas, setEtiquetas, addEtiqueta, removeEtiqueta, updateEtiqueta } = useEtiquetas();
+  const [showNewEtiqueta, setShowNewEtiqueta] = useState(false);
+  const [editingEtiqueta, setEditingEtiqueta] = useState<string | null>(null);
+  const [etiquetaForm, setEtiquetaForm] = useState({ 
+    nome: '', 
+    cor: PRESET_COLORS[0],
+    followup_texto: '',
+    followup_horas: 0
+  });
+
+  // Respostas rápidas state
+  const [showNewResposta, setShowNewResposta] = useState(false);
+  const [editingResposta, setEditingResposta] = useState<string | null>(null);
+  const [respostaForm, setRespostaForm] = useState({ atalho: '', texto: '' });
+
+  // Templates state
+  const [showNewTemplate, setShowNewTemplate] = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<string | null>(null);
+  const [templateForm, setTemplateForm] = useState({ nome: '', categoria: 'Geral', texto: '' });
+
+  useEffect(() => {
+    fetchRespostas().then(setRespostas);
+  }, []);
+
+  // Respostas handlers
+  const handleSaveResposta = async () => {
+    if (!respostaForm.atalho.trim() || !respostaForm.texto.trim()) return;
+    if (editingResposta) {
+      setRespostas(prev => prev.map(r => r.id === editingResposta ? { ...r, ...respostaForm } : r));
+      setEditingResposta(null);
+    } else {
+      const nova = await salvarResposta(respostaForm);
+      setRespostas(prev => [...prev, nova]);
+    }
+    setRespostaForm({ atalho: '', texto: '' });
+    setShowNewResposta(false);
+  };
+
+  const handleDeleteResposta = (id: string) => {
+    setRespostas(prev => prev.filter(r => r.id !== id));
+  };
+
+  const handleEditResposta = (r: RespostaRapida) => {
+    setEditingResposta(r.id);
+    setRespostaForm({ atalho: r.atalho, texto: r.texto });
+    setShowNewResposta(true);
+  };
+
+  // Templates handlers
+  const handleSaveTemplate = () => {
+    if (!templateForm.nome.trim() || !templateForm.texto.trim()) return;
+    if (editingTemplate) {
+      setTemplates(prev => prev.map(t => t.id === editingTemplate ? { ...t, ...templateForm } : t));
+      setEditingTemplate(null);
+    } else {
+      setTemplates(prev => [...prev, { ...templateForm, id: Date.now().toString() }]);
+    }
+    setTemplateForm({ nome: '', categoria: 'Geral', texto: '' });
+    setShowNewTemplate(false);
+  };
+
+  const handleDeleteTemplate = (id: string) => {
+    setTemplates(prev => prev.filter(t => t.id !== id));
+  };
+
+  const handleEditTemplate = (t: Template) => {
+    setEditingTemplate(t.id);
+    setTemplateForm({ nome: t.nome, categoria: t.categoria, texto: t.texto });
+    setShowNewTemplate(true);
+  };
+
+  const filteredTemplates = catFilter === 'Todos' ? templates : templates.filter(t => t.categoria === catFilter);
+
+  return (
+    <div className="flex flex-col h-full bg-background">
+      {/* Header */}
+      <div className="px-6 py-5 border-b bg-card">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+            <Settings size={20} className="text-primary" />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold text-foreground">Configurações</h1>
+            <p className="text-xs text-muted-foreground">Gerencie respostas rápidas e templates de mensagem</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="px-6 pt-4 bg-card border-b">
+        <div className="flex gap-1 bg-secondary rounded-xl p-1 w-fit flex-wrap">
+          <button
+            onClick={() => setTab('geral')}
+            className={cn(
+              'flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all',
+              tab === 'geral'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <ImageIcon size={16} /> Geral
+          </button>
+          <button
+            onClick={() => setTab('respostas')}
+            className={cn(
+              'flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all',
+              tab === 'respostas'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Zap size={16} /> Respostas Rápidas
+          </button>
+          <button
+            onClick={() => setTab('templates')}
+            className={cn(
+              'flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all',
+              tab === 'templates'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <FileText size={16} /> Templates
+          </button>
+          <button
+            onClick={() => setTab('etiquetas')}
+            className={cn(
+              'flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg transition-all',
+              tab === 'etiquetas'
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            <Tag size={16} /> Etiquetas
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-6 scrollbar-thin">
+        {/* === GERAL (LOGO) === */}
+        {tab === 'geral' && (
+          <div className="max-w-3xl space-y-4">
+            <div>
+              <h2 className="text-sm font-bold text-foreground">Personalização</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Configure a identidade visual do seu CRM</p>
+            </div>
+
+            <div className="border rounded-xl p-5 bg-card space-y-4">
+              <label className="text-xs font-semibold text-muted-foreground">Logo da Empresa</label>
+              <div className="flex items-center gap-5">
+                <div className="w-20 h-20 rounded-2xl bg-secondary border-2 border-dashed border-border flex items-center justify-center overflow-hidden shrink-0">
+                  {logoUrl ? (
+                    <img src={logoUrl} alt="Logo" className="w-full h-full object-cover" />
+                  ) : (
+                    <ImageIcon size={28} className="text-muted-foreground/30" />
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    A logo aparece no menu lateral e identifica seu CRM. Use uma imagem quadrada (PNG, JPG).
+                  </p>
+                  <div className="flex gap-2">
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setLogoUrl(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+                    <Button size="sm" className="gap-1.5 text-xs" onClick={() => logoInputRef.current?.click()}>
+                      <Upload size={13} /> {logoUrl ? 'Trocar Logo' : 'Enviar Logo'}
+                    </Button>
+                    {logoUrl && (
+                      <Button variant="outline" size="sm" className="text-xs text-destructive hover:text-destructive" onClick={() => setLogoUrl(null)}>
+                        <X size={13} /> Remover
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* === RESPOSTAS RÁPIDAS === */}
+        {tab === 'respostas' && (
+          <div className="max-w-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold">Respostas Rápidas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Use o atalho <span className="font-mono font-semibold text-primary">/</span> no chat para acessar rapidamente
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 rounded-lg"
+                onClick={() => { setShowNewResposta(true); setEditingResposta(null); setRespostaForm({ atalho: '', texto: '' }); }}
+              >
+                <Plus size={14} /> Nova Resposta
+              </Button>
+            </div>
+
+            {showNewResposta && (
+              <div className="border rounded-xl p-4 space-y-3 bg-card shadow-sm animate-fade-in">
+                <h3 className="text-xs font-semibold text-muted-foreground">
+                  {editingResposta ? 'Editar Resposta' : 'Nova Resposta Rápida'}
+                </h3>
+                <div className="flex gap-3">
+                  <div className="w-32 shrink-0">
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Atalho</label>
+                    <Input
+                      placeholder="/exemplo"
+                      value={respostaForm.atalho}
+                      onChange={e => setRespostaForm(f => ({ ...f, atalho: e.target.value }))}
+                      className="text-sm h-9 font-mono bg-secondary border-0"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Mensagem</label>
+                    <Textarea
+                      placeholder="Digite o texto da resposta rápida..."
+                      value={respostaForm.texto}
+                      onChange={e => setRespostaForm(f => ({ ...f, texto: e.target.value }))}
+                      className="text-sm bg-secondary border-0 min-h-[80px] resize-none"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => { setShowNewResposta(false); setEditingResposta(null); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button size="sm" className="text-xs gap-1" onClick={handleSaveResposta}>
+                    <Save size={12} /> {editingResposta ? 'Atualizar' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {respostas.map(r => (
+                <div key={r.id} className="border rounded-xl p-4 bg-card hover:shadow-sm transition-shadow group flex items-start gap-4">
+                  <div className="shrink-0">
+                    <span className="font-mono text-sm font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">{r.atalho}</span>
+                  </div>
+                  <p className="flex-1 text-sm text-muted-foreground leading-relaxed">{r.texto}</p>
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleEditResposta(r)}>
+                      <Edit2 size={13} />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteResposta(r.id)}>
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {respostas.length === 0 && (
+                <div className="text-center py-12 border rounded-xl bg-card">
+                  <Zap size={36} className="mx-auto text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">Nenhuma resposta rápida cadastrada</p>
+                  <p className="text-xs text-muted-foreground mt-1">Crie sua primeira resposta rápida para agilizar o atendimento</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* === TEMPLATES === */}
+        {tab === 'templates' && (
+          <div className="max-w-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold">Templates de Mensagem</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Modelos prontos com variáveis <span className="font-mono text-primary">{'{{variavel}}'}</span>
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 rounded-lg"
+                onClick={() => { setShowNewTemplate(true); setEditingTemplate(null); setTemplateForm({ nome: '', categoria: 'Geral', texto: '' }); }}
+              >
+                <Plus size={14} /> Novo Template
+              </Button>
+            </div>
+
+            {/* Category filter */}
+            <div className="flex gap-1.5 flex-wrap">
+              {categorias.map(c => (
+                <button
+                  key={c}
+                  onClick={() => setCatFilter(c)}
+                  className={cn(
+                    'text-xs font-medium px-3 py-1.5 rounded-lg transition-all border',
+                    catFilter === c
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-card text-muted-foreground border-border hover:border-primary/30 hover:text-foreground'
+                  )}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+
+            {showNewTemplate && (
+              <div className="border rounded-xl p-4 space-y-3 bg-card shadow-sm animate-fade-in">
+                <h3 className="text-xs font-semibold text-muted-foreground">
+                  {editingTemplate ? 'Editar Template' : 'Novo Template'}
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Nome</label>
+                    <Input
+                      placeholder="Ex: Confirmação de pedido"
+                      value={templateForm.nome}
+                      onChange={e => setTemplateForm(f => ({ ...f, nome: e.target.value }))}
+                      className="text-sm h-9 bg-secondary border-0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Categoria</label>
+                    <select
+                      value={templateForm.categoria}
+                      onChange={e => setTemplateForm(f => ({ ...f, categoria: e.target.value }))}
+                      className="w-full text-sm h-9 border rounded-lg px-2.5 bg-secondary border-0 text-foreground focus:ring-2 focus:ring-ring focus:outline-none"
+                    >
+                      {categorias.filter(c => c !== 'Todos').map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">
+                    Mensagem <span className="text-muted-foreground/60">(use {'{{variavel}}'} para campos dinâmicos)</span>
+                  </label>
+                  <Textarea
+                    placeholder="Olá {{nome}}, seu pedido {{pedido}} está pronto..."
+                    value={templateForm.texto}
+                    onChange={e => setTemplateForm(f => ({ ...f, texto: e.target.value }))}
+                    className="text-sm bg-secondary border-0 min-h-[100px] resize-none"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                    onClick={() => { setShowNewTemplate(false); setEditingTemplate(null); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button size="sm" className="text-xs gap-1" onClick={handleSaveTemplate}>
+                    <Save size={12} /> {editingTemplate ? 'Atualizar' : 'Salvar'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {filteredTemplates.map(t => (
+                <div key={t.id} className="border rounded-xl p-4 bg-card hover:shadow-sm transition-shadow group space-y-2">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h4 className="text-sm font-semibold flex items-center gap-1.5">
+                        <MessageSquare size={14} className="text-primary" />
+                        {t.nome}
+                      </h4>
+                      <Badge variant="secondary" className="text-[10px] mt-1 font-medium">{t.categoria}</Badge>
+                    </div>
+                    <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => handleEditTemplate(t)}>
+                        <Edit2 size={13} />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteTemplate(t.id)}>
+                        <Trash2 size={13} />
+                      </Button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">{t.texto}</p>
+                </div>
+              ))}
+            </div>
+
+            {filteredTemplates.length === 0 && (
+              <div className="text-center py-12 border rounded-xl bg-card">
+                <FileText size={36} className="mx-auto text-muted-foreground/20 mb-3" />
+                <p className="text-sm text-muted-foreground">Nenhum template nesta categoria</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* === ETIQUETAS === */}
+        {tab === 'etiquetas' && (
+          <div className="max-w-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Etiquetas</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Crie e gerencie etiquetas para organizar suas conversas
+                </p>
+              </div>
+              <Button
+                size="sm"
+                className="gap-1.5 rounded-lg"
+                onClick={() => { 
+                  setShowNewEtiqueta(true); 
+                  setEditingEtiqueta(null); 
+                  setEtiquetaForm({ 
+                    nome: '', 
+                    cor: PRESET_COLORS[0],
+                    followup_texto: '',
+                    followup_horas: 0
+                  }); 
+                }}
+              >
+                <Plus size={14} /> Nova Etiqueta
+              </Button>
+            </div>
+
+            {showNewEtiqueta && (
+              <div className="border rounded-xl p-4 space-y-3 bg-card shadow-sm animate-fade-in">
+                <h3 className="text-xs font-semibold text-muted-foreground">
+                  {editingEtiqueta ? 'Editar Etiqueta' : 'Nova Etiqueta'}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Nome</label>
+                    <Input
+                      placeholder="Ex: VIP, Urgente, Atacado..."
+                      value={etiquetaForm.nome}
+                      onChange={e => setEtiquetaForm(f => ({ ...f, nome: e.target.value }))}
+                      className="text-sm h-9 bg-secondary border-0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] text-muted-foreground mb-1 block">Tempo Follow-up (Horas)</label>
+                    <Input
+                      type="number"
+                      placeholder="0 = desativado"
+                      value={etiquetaForm.followup_horas}
+                      onChange={e => setEtiquetaForm(f => ({ ...f, followup_horas: parseInt(e.target.value) || 0 }))}
+                      className="text-sm h-9 bg-secondary border-0"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1 block">Mensagem Automática (Follow-up)</label>
+                  <Textarea
+                    placeholder="Olá! Vi que você não respondeu..."
+                    value={etiquetaForm.followup_texto}
+                    onChange={e => setEtiquetaForm(f => ({ ...f, followup_texto: e.target.value }))}
+                    className="text-sm bg-secondary border-0 min-h-[80px] resize-none"
+                  />
+                  <p className="text-[10px] text-muted-foreground mt-1">Essa mensagem será enviada automaticamente após o tempo definido se você marcar essa etiqueta no chat.</p>
+                </div>
+                <div>
+                  <label className="text-[11px] text-muted-foreground mb-1.5 block">Cor</label>
+                  <div className="flex gap-2 flex-wrap">
+                    {PRESET_COLORS.map(cor => (
+                      <button
+                        key={cor}
+                        onClick={() => setEtiquetaForm(f => ({ ...f, cor }))}
+                        className={cn(
+                          'w-8 h-8 rounded-lg border-2 transition-all',
+                          etiquetaForm.cor === cor ? 'scale-110 border-foreground shadow-md' : 'border-transparent hover:scale-105'
+                        )}
+                        style={{ backgroundColor: cor }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 pt-1">
+                  <div className="flex-1">
+                    <span className="text-[10px] text-muted-foreground">Preview:</span>
+                    <div className="mt-1">
+                      <span
+                        className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+                        style={{ backgroundColor: etiquetaForm.cor + '20', color: etiquetaForm.cor, border: `1px solid ${etiquetaForm.cor}40` }}
+                      >
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: etiquetaForm.cor }} />
+                        {etiquetaForm.nome || 'Etiqueta'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs"
+                      onClick={() => { 
+                        setShowNewEtiqueta(false); 
+                        setEditingEtiqueta(null); 
+                        setEtiquetaForm({ nome: '', cor: PRESET_COLORS[0], followup_texto: '', followup_horas: 0 });
+                      }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button size="sm" className="text-xs gap-1" onClick={() => {
+                      if (!etiquetaForm.nome.trim()) return;
+                      if (editingEtiqueta) {
+                        updateEtiqueta(editingEtiqueta, etiquetaForm);
+                      } else {
+                        addEtiqueta(etiquetaForm);
+                      }
+                      setEtiquetaForm({ nome: '', cor: PRESET_COLORS[0], followup_texto: '', followup_horas: 0 });
+                      setShowNewEtiqueta(false);
+                      setEditingEtiqueta(null);
+                    }}>
+                      <Save size={12} /> {editingEtiqueta ? 'Atualizar' : 'Salvar'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {etiquetas.map(e => (
+                <div key={e.id} className="border rounded-xl p-4 bg-card hover:shadow-sm transition-shadow group flex items-center gap-4">
+                  <span
+                    className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: e.cor + '20', color: e.cor, border: `1px solid ${e.cor}40` }}
+                  >
+                    <span className="w-2 h-2 rounded-full" style={{ backgroundColor: e.cor }} />
+                    {e.nome}
+                  </span>
+                  <div className="flex-1" />
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                      onClick={() => { 
+                        setEditingEtiqueta(e.id); 
+                        setEtiquetaForm({ 
+                          nome: e.nome, 
+                          cor: e.cor,
+                          followup_texto: e.followup_texto || '',
+                          followup_horas: e.followup_horas || 0
+                        }); 
+                        setShowNewEtiqueta(true); 
+                      }}
+                    >
+                      <Edit2 size={13} />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      onClick={() => removeEtiqueta(e.id)}
+                    >
+                      <Trash2 size={13} />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+              {etiquetas.length === 0 && (
+                <div className="text-center py-12 border rounded-xl bg-card">
+                  <Tag size={36} className="mx-auto text-muted-foreground/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">Nenhuma etiqueta cadastrada</p>
+                  <p className="text-xs text-muted-foreground mt-1">Crie etiquetas para categorizar suas conversas</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
