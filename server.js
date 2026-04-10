@@ -62,6 +62,8 @@ async function processarIA(remoteJid, textoDaMensagem) {
             orderBy: { criado_em: 'asc' },
             take: 10
         });
+        console.log(`📜 Histórico carregado: ${historico.length} mensagens`);
+        historico.forEach(m => console.log(`  [${m.origem}]: ${m.texto}`));
 
         const systemPrompt = `[IDENTIDADE]
 Você se chama Deise e faz parte da equipe da FBS Camisetas (localizada em Mauá - SP).
