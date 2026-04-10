@@ -655,10 +655,17 @@ cron.schedule('0 9 * * *', async () => {
 });
 
 // SPA support: Fallback para o index.html em qualquer rota não-API
-const path = require('path');
 app.get('*', (req, res) => {
     if (!req.path.startsWith('/api')) {
-        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+        // Tenta servir do painel novo primeiro
+        res.sendFile(path.join(__dirname, 'cloned_frontend/dist', 'index.html'), (err) => {
+            if (err) {
+                // Se não encontrar no novo, tenta no antigo (public)
+                res.sendFile(path.join(__dirname, 'public', 'index.html'), (err2) => {
+                   if (err2) res.status(404).send('Página não encontrada');
+                });
+            }
+        });
     } else {
         res.status(404).json({ error: 'Endpoint não encontrado' });
     }
