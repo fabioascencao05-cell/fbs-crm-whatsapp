@@ -510,6 +510,79 @@ app.delete('/api/respostas/:id', async (req, res) => {
     res.json({ success: true });
 });
 
+// ==========================================
+// PIPELINE EDITÁVEL
+// ==========================================
+const DEFAULT_PIPELINE = [
+    { nome: 'Novos', cor: 'hsl(210,80%,55%)', ordem: 0 },
+    { nome: 'Em Negociação', cor: 'hsl(38,92%,50%)', ordem: 1 },
+    { nome: 'Aguardando Pagamento', cor: 'hsl(145,63%,42%)', ordem: 2 },
+    { nome: 'Pedido Aprovado', cor: 'hsl(262,83%,58%)', ordem: 3 },
+    { nome: 'Pedido Entregue', cor: 'hsl(220,15%,70%)', ordem: 4 },
+];
+
+app.get('/api/pipeline', async (req, res) => {
+    try {
+        let columns = await prisma.pipelineColumn.findMany({ orderBy: { ordem: 'asc' } });
+        // Seed: se não tem colunas, cria as padrão
+        if (columns.length === 0) {
+            for (const col of DEFAULT_PIPELINE) {
+                await prisma.pipelineColumn.create({ data: col });
+            }
+            columns = await prisma.pipelineColumn.findMany({ orderBy: { ordem: 'asc' } });
+        }
+        res.json(columns);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/pipeline', async (req, res) => {
+    const { nome, cor } = req.body;
+    if (!nome) return res.status(400).json({ error: 'Nome é obrigatório' });
+    try {
+        const maxOrdem = await prisma.pipelineColumn.aggregate({ _max: { ordem: true } });
+        const col = await prisma.pipelineColumn.create({
+            data: { nome, cor: cor || 'hsl(210,80%,55%)', ordem: (maxOrdem._max.ordem || 0) + 1 }
+        });
+        res.json(col);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/pipeline/:id', async (req, res) => {
+    const { nome, cor, ordem } = req.body;
+    try {
+        const data = {};
+        if (nome !== undefined) data.nome = nome;
+        if (cor !== undefined) data.cor = cor;
+        if (ordem !== undefined) data.ordem = ordem;
+        const col = await prisma.pipelineColumn.update({ where: { id: parseInt(req.params.id) }, data });
+        res.json(col);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/pipeline/:id', async (req, res) => {
+    try {
+        const col = await prisma.pipelineColumn.findUnique({ where: { id: parseInt(req.params.id) } });
+        if (!col) return res.status(404).json({ error: 'Coluna não encontrada' });
+        // Move leads dessa coluna para "Novos"
+        await prisma.conversa.updateMany({
+            where: { status_kanban: col.nome },
+            data: { status_kanban: 'Novos' }
+        });
+        await prisma.pipelineColumn.delete({ where: { id: parseInt(req.params.id) } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/pipeline/reorder', async (req, res) => {
+    const { ordem } = req.body; // [{ id: 1, ordem: 0 }, { id: 2, ordem: 1 }, ...]
+    try {
+        for (const item of ordem) {
+            await prisma.pipelineColumn.update({ where: { id: item.id }, data: { ordem: item.ordem } });
+        }
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // Stats - disponível em AMBAS as URLs para compatibilidade
 app.get('/api/stats', async (req, res) => {
     try {

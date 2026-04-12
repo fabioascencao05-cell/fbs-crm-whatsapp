@@ -91,3 +91,11 @@ model FollowUp {
   criado_em     DateTime @default(now())
   enviado_em    DateTime?
 }
+
+model PipelineColumn {
+  id        Int      @id @default(autoincrement())
+  nome      String   @unique
+  cor       String   @default("hsl(210,80%,55%)")
+  ordem     Int      @default(0)
+  criado_em DateTime @default(now())
+}

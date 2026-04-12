@@ -1,10 +1,26 @@
 import { useState, useEffect } from 'react';
-import { GripVertical, Tag, CalendarClock, Settings2, MessageCircle, TrendingUp, Users } from 'lucide-react';
+import { Plus, Trash2, Edit2, Check, X, CalendarClock, MessageCircle, TrendingUp, Users, GripVertical, Settings2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fetchConversas, mudarKanban } from '@/services/api';
 import type { Conversa } from '@/types/crm';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
+
+interface PipelineCol {
+  id: number;
+  nome: string;
+  cor: string;
+  ordem: number;
+}
+
+const PRESET_COLORS = [
+  'hsl(210,80%,55%)', 'hsl(38,92%,50%)', 'hsl(145,63%,42%)',
+  'hsl(262,83%,58%)', 'hsl(220,15%,70%)', 'hsl(0,84%,60%)',
+  'hsl(330,81%,60%)', 'hsl(25,95%,53%)', 'hsl(180,50%,40%)',
+];
 
 function formatWhatsAppDate(dateStr: string) {
   const date = new Date(dateStr);
@@ -19,18 +35,28 @@ function formatWhatsAppDate(dateStr: string) {
 export default function KanbanPage() {
   const navigate = useNavigate();
   const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [columns, setColumns] = useState<PipelineCol[]>([]);
   const [dragItem, setDragItem] = useState<string | null>(null);
   const [dragOverCol, setDragOverCol] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
-  useEffect(() => { fetchConversas().then(setConversas); }, []);
+  // Inline create/edit
+  const [newColName, setNewColName] = useState('');
+  const [newColCor, setNewColCor] = useState(PRESET_COLORS[0]);
+  const [editingCol, setEditingCol] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editCor, setEditCor] = useState('');
 
-  const columns = [
-    { name: 'Novos', color: 'hsl(210,80%,55%)' },
-    { name: 'Em Negociação', color: 'hsl(38,92%,50%)' },
-    { name: 'Aguardando Pagamento', color: 'hsl(145,63%,42%)' },
-    { name: 'Pedido Aprovado', color: 'hsl(262,83%,58%)' },
-    { name: 'Pedido Entregue', color: 'hsl(220,15%,70%)' },
-  ];
+  const loadData = async () => {
+    const [convs, cols] = await Promise.all([
+      fetchConversas(),
+      fetch('/api/pipeline').then(r => r.json())
+    ]);
+    setConversas(convs);
+    setColumns(cols);
+  };
+
+  useEffect(() => { loadData(); }, []);
 
   const getColumnData = (colName: string) => {
     const items = conversas.filter(c => c.status_kanban === colName);
@@ -46,6 +72,43 @@ export default function KanbanPage() {
     setDragOverCol(null);
   };
 
+  const handleCreateColumn = async () => {
+    if (!newColName.trim()) return;
+    try {
+      await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: newColName.trim(), cor: newColCor })
+      });
+      toast.success(`Coluna "${newColName}" criada!`);
+      setNewColName('');
+      setNewColCor(PRESET_COLORS[0]);
+      loadData();
+    } catch { toast.error('Erro ao criar coluna'); }
+  };
+
+  const handleEditColumn = async (id: number) => {
+    try {
+      await fetch(`/api/pipeline/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nome: editName, cor: editCor })
+      });
+      toast.success('Coluna atualizada!');
+      setEditingCol(null);
+      loadData();
+    } catch { toast.error('Erro ao editar'); }
+  };
+
+  const handleDeleteColumn = async (id: number, nome: string) => {
+    if (!confirm(`Excluir a coluna "${nome}"? Os leads serão movidos para "Novos".`)) return;
+    try {
+      await fetch(`/api/pipeline/${id}`, { method: 'DELETE' });
+      toast.success(`Coluna "${nome}" excluída`);
+      loadData();
+    } catch { toast.error('Erro ao excluir'); }
+  };
+
   return (
     <div className="h-full flex flex-col p-4 lg:p-6 bg-background/50 overflow-hidden">
       <div className="mb-6 flex items-center justify-between">
@@ -55,33 +118,129 @@ export default function KanbanPage() {
           </h1>
           <p className="text-xs text-muted-foreground mt-0.5">Gestão visual do faturamento potencial.</p>
         </div>
-        <div className="text-right">
-          <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Faturamento Total</p>
-          <p className="text-lg font-bold text-primary">
-            {conversas.reduce((acc, c) => acc + (c.valor_conversa || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </p>
+        <div className="flex items-center gap-3">
+          <div className="text-right">
+            <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Faturamento Total</p>
+            <p className="text-lg font-bold text-primary">
+              {conversas.reduce((acc, c) => acc + (c.valor_conversa || 0), 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </p>
+          </div>
+          <Button
+            variant={showSettings ? "default" : "outline"}
+            size="sm"
+            className="gap-1.5 text-xs rounded-xl"
+            onClick={() => setShowSettings(!showSettings)}
+          >
+            <Settings2 size={14} />
+            {showSettings ? 'Fechar' : 'Editar Colunas'}
+          </Button>
         </div>
       </div>
 
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="mb-6 bg-card rounded-2xl border p-5 shadow-sm space-y-4 animate-in slide-in-from-top-2">
+          <h3 className="text-sm font-bold flex items-center gap-2">
+            <Settings2 size={14} className="text-primary" /> Gerenciar Colunas do Funil
+          </h3>
+
+          {/* Existing columns */}
+          <div className="space-y-2">
+            {columns.map(col => (
+              <div key={col.id} className="flex items-center gap-3 bg-secondary/30 rounded-xl px-3 py-2">
+                {editingCol === col.id ? (
+                  <>
+                    <Input
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      className="text-xs h-8 flex-1"
+                      autoFocus
+                    />
+                    <div className="flex gap-1">
+                      {PRESET_COLORS.map(c => (
+                        <button
+                          key={c}
+                          onClick={() => setEditCor(c)}
+                          className={cn("w-5 h-5 rounded-full border-2 transition-all", editCor === c ? 'border-foreground scale-110' : 'border-transparent')}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-success" onClick={() => handleEditColumn(col.id)}>
+                      <Check size={14} />
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => setEditingCol(null)}>
+                      <X size={14} />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: col.cor }} />
+                    <span className="text-xs font-semibold flex-1">{col.nome}</span>
+                    <Badge variant="secondary" className="text-[10px]">{getColumnData(col.nome).items.length} leads</Badge>
+                    <button
+                      onClick={() => { setEditingCol(col.id); setEditName(col.nome); setEditCor(col.cor); }}
+                      className="text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <Edit2 size={12} />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteColumn(col.id, col.nome)}
+                      className="text-muted-foreground hover:text-destructive transition-colors"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Add new column */}
+          <div className="flex items-center gap-3 border-t border-border/50 pt-4">
+            <Input
+              value={newColName}
+              onChange={e => setNewColName(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleCreateColumn(); }}
+              placeholder="Nova coluna (ex: Fornecedores, Não Fechou)..."
+              className="text-xs h-9 flex-1"
+            />
+            <div className="flex gap-1">
+              {PRESET_COLORS.slice(0, 5).map(c => (
+                <button
+                  key={c}
+                  onClick={() => setNewColCor(c)}
+                  className={cn("w-5 h-5 rounded-full border-2 transition-all", newColCor === c ? 'border-foreground scale-110' : 'border-transparent')}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
+            <Button size="sm" className="gap-1 text-xs h-9 rounded-xl" onClick={handleCreateColumn} disabled={!newColName.trim()}>
+              <Plus size={14} /> Criar
+            </Button>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex gap-4 overflow-x-auto pb-6 no-scrollbar">
         {columns.map(col => {
-          const { items, totalValue } = getColumnData(col.name);
+          const { items, totalValue } = getColumnData(col.nome);
           return (
             <div
-              key={col.name}
+              key={col.id}
               className={cn(
                 'min-w-[300px] w-80 flex flex-col rounded-2xl shrink-0 transition-all border border-border/50',
-                dragOverCol === col.name ? 'bg-primary/5 ring-2 ring-primary/20 scale-[1.01]' : 'bg-secondary/30'
+                dragOverCol === col.nome ? 'bg-primary/5 ring-2 ring-primary/20 scale-[1.01]' : 'bg-secondary/30'
               )}
-              onDragOver={e => { e.preventDefault(); setDragOverCol(col.name); }}
+              onDragOver={e => { e.preventDefault(); setDragOverCol(col.nome); }}
               onDragLeave={() => setDragOverCol(null)}
-              onDrop={() => handleDrop(col.name)}
+              onDrop={() => handleDrop(col.nome)}
             >
               <div className="px-4 py-4 border-b border-border/10 bg-card/30 rounded-t-2xl">
                 <div className="flex items-center justify-between mb-2">
-                  <Badge variant="outline" className="text-[10px] font-bold border px-2 py-0.5 uppercase tracking-wide" style={{ backgroundColor: col.color + '15', color: col.color, borderColor: col.color + '30' }}>
-                    <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: col.color }} />
-                    {col.name}
+                  <Badge variant="outline" className="text-[10px] font-bold border px-2 py-0.5 uppercase tracking-wide" style={{ backgroundColor: col.cor + '15', color: col.cor, borderColor: col.cor + '30' }}>
+                    <span className="w-1.5 h-1.5 rounded-full mr-2" style={{ backgroundColor: col.cor }} />
+                    {col.nome}
                   </Badge>
                   <Badge variant="secondary" className="text-[10px] font-bold h-5 px-2">{items.length}</Badge>
                 </div>

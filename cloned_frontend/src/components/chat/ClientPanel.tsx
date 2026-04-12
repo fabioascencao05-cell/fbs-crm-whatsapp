@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { User, Phone, Tag, Plus, X, Columns3, ArrowLeft, Edit2, Check, Bot, BotOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -86,7 +86,13 @@ export function ClientPanel({ conversa, respostas, onConversaUpdate, onBack }: P
     onConversaUpdate?.({ ...conversa, status_kanban: status });
   };
 
-  const pipelineOptions = ['Novos', 'Em Negociação', 'Aguardando Pagamento', 'Pedido Aprovado', 'Pedido Entregue'];
+  const [pipelineOptions, setPipelineOptions] = useState<string[]>(['Novos']);
+
+  useEffect(() => {
+    fetch('/api/pipeline').then(r => r.json()).then((cols: any[]) => {
+      if (cols.length > 0) setPipelineOptions(cols.map(c => c.nome));
+    }).catch(() => {});
+  }, []);
 
   return (
     <div className="flex flex-col h-full bg-card border-l">
