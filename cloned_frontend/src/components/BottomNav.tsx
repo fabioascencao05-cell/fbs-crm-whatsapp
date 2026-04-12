@@ -8,6 +8,7 @@ const navItems = [
   { to: '/followup', icon: CalendarClock, label: 'Aviso' },
   { to: '/broadcast', icon: Send, label: 'Massa' },
   { to: '/dashboard', icon: BarChart3, label: 'Dash' },
+  { to: '/settings', icon: Settings, label: 'Config' },
 ];
 
 export function BottomNav() {

@@ -71,8 +71,8 @@ export default function ChatPage() {
     <div className="flex h-full w-full overflow-hidden">
       {/* Col 1: Conversations List */}
       <div className={cn(
-        'w-80 shrink-0 border-r',
-        'max-lg:absolute max-lg:inset-0 max-lg:w-full max-lg:z-20 max-lg:bg-card',
+        'w-80 shrink-0 border-r flex flex-col',
+        'max-lg:w-full max-lg:bg-card bg-background',
         mobileView !== 'list' && 'max-lg:hidden'
       )}>
         <ConversaList conversas={conversas} activeId={active?.id ?? null} onSelect={handleSelect} />
@@ -80,8 +80,7 @@ export default function ChatPage() {
 
       {/* Col 2: Chat */}
       <div className={cn(
-        'flex-1 min-w-0',
-        'max-lg:absolute max-lg:inset-0 max-lg:z-20 max-lg:bg-background',
+        'flex-1 min-w-0 flex flex-col bg-background',
         mobileView !== 'chat' && 'max-lg:hidden'
       )}>
         {active ? (
@@ -103,17 +102,17 @@ export default function ChatPage() {
             <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
               <MessageSquare className="w-7 h-7 text-muted-foreground/50" />
             </div>
-            <p className="text-sm font-semibold italic">FBS Camisetas — Selecione uma conversa para faturar</p>
+            <p className="text-sm font-semibold italic text-center px-4">FBS Camisetas — Selecione uma conversa para faturar</p>
           </div>
         )}
       </div>
 
       {/* Col 3: Client Panel */}
-      {active && showPanel && (
+      {showPanel && active && (
         <div className={cn(
-          'w-72 shrink-0 border-l hidden xl:block',
-          'max-lg:absolute max-lg:inset-0 max-lg:z-20 max-lg:bg-card',
-          mobileView === 'panel' ? 'max-lg:block' : 'max-lg:hidden'
+          'w-72 shrink-0 border-l lg:flex flex-col bg-card',
+          'max-lg:w-full',
+          mobileView === 'panel' ? 'max-lg:flex hidden' : 'hidden'
         )}>
           <ClientPanel
             conversa={active}
