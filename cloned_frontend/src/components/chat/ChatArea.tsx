@@ -182,27 +182,18 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
           <span className="hidden sm:inline">{conversa.status_bot ? 'Robô ON' : 'Robô OFF'}</span>
         </Button>
 
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8">
-              <Trash2 size={16} />
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Excluir conversa?</AlertDialogTitle>
-              <AlertDialogDescription>
-                Isso removerá permanentemente a conversa com {conversa.nome}. Esta ação não pode ser desfeita.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                Excluir
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="text-destructive/70 hover:text-destructive hover:bg-destructive/10 h-8 w-8"
+          onClick={() => {
+            if (window.confirm(`Excluir permanentemente a conversa com ${conversa.nome}? Esta ação não pode ser desfeita.`)) {
+              handleDelete();
+            }
+          }}
+        >
+          <Trash2 size={16} />
+        </Button>
       </div>
       
       {/* Etiqueta Bar */}
