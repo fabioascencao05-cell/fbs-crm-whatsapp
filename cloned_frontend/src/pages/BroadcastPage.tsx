@@ -4,28 +4,42 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { fetchConversas, fetchRespostas, enviarBroadcast } from '@/services/api';
+import { fetchConversas, fetchRespostas } from '@/services/api';
 import type { Conversa, RespostaRapida } from '@/types/crm';
+import { useEtiquetas } from '@/contexts/EtiquetasContext';
 import { toast } from 'sonner';
+
+interface Template {
+  id: string;
+  nome: string;
+  categoria: string;
+  texto: string;
+}
+
+const mockTemplates: Template[] = [
+  { id: '1', nome: 'Boas-vindas', categoria: 'Geral', texto: 'Olá! Bem-vindo à FBS Camisetas! 👕 Como posso ajudar você hoje?' },
+  { id: '2', nome: 'Orçamento', categoria: 'Vendas', texto: 'Oi, segue o orçamento solicitado. Aguardo sua aprovação!' },
+  { id: '3', nome: 'Prazo de entrega', categoria: 'Produção', texto: 'Olá, informamos que seu pedido tem previsão de entrega para os próximos dias. Qualquer dúvida estamos à disposição!' },
+  { id: '4', nome: 'Pagamento PIX', categoria: 'Financeiro', texto: 'Segue nossa chave PIX para pagamento:\n\n🏦 Chave: fbs@camisetas.com\n\nApós o pagamento, envie o comprovante aqui.' },
+  { id: '5', nome: 'Pedido pronto', categoria: 'Produção', texto: 'Ótima notícia! 🎉 Seu pedido está pronto! Podemos combinar a entrega ou retirada. O que prefere?' },
+  { id: '6', nome: 'Follow-up', categoria: 'Vendas', texto: 'Olá! Tudo bem? Passando para verificar se ainda tem interesse nas nossas camisetas. Posso te ajudar com alguma dúvida? 😊' },
+  { id: '7', nome: 'Promoção', categoria: 'Vendas', texto: '🔥 Promoção especial FBS Camisetas! Aproveite condições exclusivas por tempo limitado. Entre em contato agora!' },
+];
 
 export default function BroadcastPage() {
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [respostas, setRespostas] = useState<RespostaRapida[]>([]);
+  const { etiquetas } = useEtiquetas();
   const [selectedPipeline, setSelectedPipeline] = useState('Todos');
   const [selectedTag, setSelectedTag] = useState('Todas');
   const [mensagem, setMensagem] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [sendResult, setSendResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetchConversas().then(setConversas);
     fetchRespostas().then(setRespostas);
   }, []);
-
-  const tagsDisponiveis = useMemo(() => {
-    const ts = new Set<string>();
-    conversas.forEach(c => c.etiquetas?.forEach(e => ts.add(e.nome)));
-    return ['Todas', ...Array.from(ts)];
-  }, [conversas]);
 
   const alvos = useMemo(() => {
     let list = conversas;
@@ -42,10 +56,19 @@ export default function BroadcastPage() {
     if (alvos.length === 0) return toast.error('Nenhum cliente selecionado');
     if (!mensagem.trim()) return toast.error('Digite a mensagem');
 
+    if (!confirm(`Confirmar disparo para ${alvos.length} cliente(s)? Esta ação enviará mensagens reais pelo WhatsApp.`)) return;
+
     setIsSending(true);
+    setSendResult(null);
     try {
-      const res = await enviarBroadcast(alvos.map(a => a.id), mensagem) as { message: string };
-      toast.success(res.message);
+      const res = await fetch('/api/broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: alvos.map(a => a.id), texto: mensagem }),
+      });
+      const data = await res.json();
+      setSendResult(data.message);
+      toast.success(data.message);
       setMensagem('');
     } catch (err) {
       toast.error('Erro ao iniciar disparo');
@@ -53,6 +76,12 @@ export default function BroadcastPage() {
       setIsSending(false);
     }
   };
+
+  // Todos os templates disponíveis (templates + respostas rápidas)
+  const todosTemplates = [
+    ...mockTemplates,
+    ...respostas.map(r => ({ id: `rr-${r.id}`, nome: r.atalho, categoria: 'Resposta Rápida', texto: r.texto }))
+  ];
 
   return (
     <div className="flex flex-col h-full bg-background p-6 overflow-y-auto scrollbar-thin">
@@ -94,9 +123,9 @@ export default function BroadcastPage() {
                     onChange={e => setSelectedTag(e.target.value)}
                     className="w-full text-xs border rounded-xl px-3 py-2.5 bg-secondary text-foreground focus:ring-2 focus:ring-primary focus:outline-none transition-all"
                   >
-                    <option value="Todas">Todas as etiquetas estratégicas</option>
-                    {tagsDisponiveis.filter(t => t !== 'Todas').map(t => (
-                      <option key={t} value={t}>{t}</option>
+                    <option value="Todas">Todas as etiquetas</option>
+                    {etiquetas.map(e => (
+                      <option key={e.id} value={e.nome}>{e.nome}</option>
                     ))}
                   </select>
                 </div>
@@ -111,15 +140,27 @@ export default function BroadcastPage() {
                     <Tag size={12} className="text-primary" />
                     <select
                       onChange={e => {
-                        const r = respostas.find(res => res.id === e.target.value);
-                        if (r) setMensagem(r.texto);
+                        const t = todosTemplates.find(tp => tp.id === e.target.value);
+                        if (t) setMensagem(t.texto);
+                        e.target.value = '';
                       }}
                       className="text-[10px] font-bold bg-primary/10 text-primary border-none rounded-lg px-2 py-1 cursor-pointer hover:bg-primary/20 transition-all focus:outline-none"
                     >
                       <option value="">PUXAR MENSAGEM PRONTA...</option>
-                      {respostas.map(r => (
-                        <option key={r.id} value={r.id}>{r.atalho}</option>
-                      ))}
+                      {mockTemplates.length > 0 && (
+                        <optgroup label="📋 Templates">
+                          {mockTemplates.map(t => (
+                            <option key={t.id} value={t.id}>{t.nome} ({t.categoria})</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {respostas.length > 0 && (
+                        <optgroup label="⚡ Respostas Rápidas">
+                          {respostas.map(r => (
+                            <option key={`rr-${r.id}`} value={`rr-${r.id}`}>{r.atalho}</option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                    </div>
                 </div>
@@ -130,6 +171,13 @@ export default function BroadcastPage() {
                   value={mensagem}
                   onChange={e => setMensagem(e.target.value)}
                 />
+
+                {sendResult && (
+                  <div className="bg-success/10 text-success border border-success/20 rounded-xl p-3 text-xs font-medium flex items-center gap-2">
+                    <CheckCircle2 size={14} />
+                    {sendResult}
+                  </div>
+                )}
 
                 <div className="bg-secondary/30 rounded-xl p-3 flex gap-3 text-[11px] text-muted-foreground">
                    <AlertCircle size={14} className="shrink-0 text-amber-500" />
@@ -161,11 +209,15 @@ export default function BroadcastPage() {
                 <div className="space-y-4">
                    <div className="flex justify-between items-center text-xs">
                      <span className="text-muted-foreground">Selecionados:</span>
-                     <span className="font-bold text-foreground">{alvos.length}</span>
+                     <span className="font-bold text-foreground text-lg text-primary">{alvos.length}</span>
                    </div>
                    <div className="flex justify-between items-center text-xs">
-                     <span className="text-muted-foreground">Público Estimado:</span>
-                     <Badge variant="secondary" className="font-bold">WhatsApp Direto</Badge>
+                     <span className="text-muted-foreground">Etapa:</span>
+                     <Badge variant="secondary" className="font-bold">{selectedPipeline}</Badge>
+                   </div>
+                   <div className="flex justify-between items-center text-xs">
+                     <span className="text-muted-foreground">Etiqueta:</span>
+                     <Badge variant="secondary" className="font-bold">{selectedTag}</Badge>
                    </div>
                    <div className="flex justify-between items-center text-xs">
                      <span className="text-muted-foreground">Risco de Ban:</span>
@@ -176,7 +228,7 @@ export default function BroadcastPage() {
 
              <div className="bg-primary/5 rounded-2xl border border-primary/10 p-5 space-y-3">
                 <h4 className="text-xs font-bold text-primary flex items-center gap-1.5 uppercase tracking-wider">
-                  Dica da Natália
+                  Dica de Ouro
                 </h4>
                 <p className="text-[11px] leading-relaxed text-foreground/80">
                   "Use o Envio em Massa para avisar sobre promoções rápidas ou novidades. Evite mandar mensagens muito longas e tente sempre ser o mais pessoal possível."

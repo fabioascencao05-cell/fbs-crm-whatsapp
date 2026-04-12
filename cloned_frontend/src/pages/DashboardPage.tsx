@@ -70,8 +70,6 @@ export default function DashboardPage() {
 
   const cards = [
     { title: 'Total Leads', value: totalConversas, icon: Users, color: 'text-primary' },
-    { title: 'Não Lidos', value: unread, icon: Clock, color: 'text-warning' },
-    { title: 'Oportunidades (R$)', value: faturamentoTotal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), icon: TrendingUp, color: 'text-success' },
     { title: 'Etapa Novos', value: novos, icon: Users, color: 'text-info' },
   ];
 
@@ -161,36 +159,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         ))}
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="bg-card rounded-2xl p-6 border shadow-sm flex flex-col justify-between border-primary/20 bg-primary/5">
-              <div>
-                <p className="text-[10px] uppercase font-bold text-primary tracking-wider mb-1">Ação Estratégica</p>
-                <h3 className="text-sm font-bold text-foreground">Reengajamento Global</h3>
-                <p className="text-[10px] text-muted-foreground mt-1">Mover todos os leads antigos para 'Novos' e ligar o Robô.</p>
-              </div>
-              <Button 
-                variant="default" 
-                size="sm" 
-                className="mt-4 bg-primary hover:bg-primary/90 text-[10px] font-bold uppercase shadow-lg shadow-primary/20"
-                onClick={async () => {
-                  if (confirm('Deseja mover TODOS os contatos para "Novos" e ativar a IA agora?')) {
-                    try {
-                      const res = await fetch('/api/admin/migrate-all', { method: 'POST' });
-                      const data = await res.json();
-                      alert(data.message || 'Migração concluída!');
-                      window.location.reload();
-                    } catch (e) {
-                      alert('Erro ao migrar. Verifique a conexão.');
-                    }
-                  }
-                }}
-              >
-                🚀 Ativar IA para Todos
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">

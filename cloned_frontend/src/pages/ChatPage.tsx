@@ -6,6 +6,7 @@ import { ChatArea } from '@/components/chat/ChatArea';
 import { ClientPanel } from '@/components/chat/ClientPanel';
 import { fetchConversas, fetchMensagens, fetchRespostas } from '@/services/api';
 import type { Conversa, Mensagem, RespostaRapida } from '@/types/crm';
+import { MessageSquare } from 'lucide-react';
 
 export default function ChatPage() {
   const [searchParams] = useSearchParams();
@@ -14,6 +15,7 @@ export default function ChatPage() {
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [respostas, setRespostas] = useState<RespostaRapida[]>([]);
   const [mobileView, setMobileView] = useState<'list' | 'chat' | 'panel'>('list');
+  const [showPanel, setShowPanel] = useState(true);
 
   useEffect(() => {
     const load = () => {
@@ -66,7 +68,7 @@ export default function ChatPage() {
   };
 
   return (
-    <div className="flex h-full w-full">
+    <div className="flex h-full w-full overflow-hidden">
       {/* Col 1: Conversations List */}
       <div className={cn(
         'w-80 shrink-0 border-r',
@@ -90,26 +92,37 @@ export default function ChatPage() {
             onMensagemEnviada={handleMensagemEnviada}
             onConversaUpdate={handleConversaUpdate}
             onBack={() => setMobileView('list')}
-            onOpenPanel={() => {}} // Painel removido
+            onOpenPanel={() => {
+              setShowPanel(prev => !prev);
+              setMobileView('panel');
+            }}
             onDelete={handleDelete}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
             <div className="w-16 h-16 rounded-full bg-secondary flex items-center justify-center">
-              <MessageSquareIcon className="w-7 h-7 text-muted-foreground/50" />
+              <MessageSquare className="w-7 h-7 text-muted-foreground/50" />
             </div>
             <p className="text-sm font-semibold italic">FBS Camisetas — Selecione uma conversa para faturar</p>
           </div>
         )}
       </div>
-    </div>
-  );
-}
 
-function MessageSquareIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-    </svg>
+      {/* Col 3: Client Panel */}
+      {active && showPanel && (
+        <div className={cn(
+          'w-72 shrink-0 border-l hidden xl:block',
+          'max-lg:absolute max-lg:inset-0 max-lg:z-20 max-lg:bg-card',
+          mobileView === 'panel' ? 'max-lg:block' : 'max-lg:hidden'
+        )}>
+          <ClientPanel
+            conversa={active}
+            respostas={respostas}
+            onConversaUpdate={handleConversaUpdate}
+            onBack={() => setMobileView('chat')}
+          />
+        </div>
+      )}
+    </div>
   );
 }
