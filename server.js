@@ -224,6 +224,11 @@ app.post('/api/conversas/delete', async (req, res) => {
     if (!id) return res.status(400).json({ error: "ID não fornecido" });
     console.log(`🗑️ Excluindo conversa: ${id}`);
     try {
+        // Desvincula etiquetas para evitar Foreign Key Constraint Error
+        await prisma.conversa.update({
+            where: { id },
+            data: { etiquetas: { set: [] } }
+        });
         await prisma.mensagem.deleteMany({ where: { conversaId: id } });
         await prisma.conversa.delete({ where: { id } });
         res.json({ success: true });
