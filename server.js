@@ -204,6 +204,28 @@ const enviarMensagemEvolution = async (number, text) => {
 };
 
 // ==========================================
+// AUTENTICAÇÃO
+// ==========================================
+app.post('/api/login', async (req, res) => {
+    const { email, senha } = req.body;
+    
+    // Login padrão para emergência
+    if (email === 'admin@fbs.com' && senha === 'fbs123') {
+        return res.json({ success: true, token: 'token-admin-fbs-camiseta-2024' });
+    }
+
+    try {
+        const usuario = await prisma.usuario.findUnique({ where: { email } });
+        if (usuario && usuario.senha === senha) {
+            return res.json({ success: true, token: `token-${usuario.id}-${Date.now()}` });
+        }
+        res.status(401).json({ success: false, error: 'E-mail ou senha incorretos' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ==========================================
 // WEBHOOK
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
@@ -481,18 +503,49 @@ app.post('/api/conversas/:id/reativar-bot', async (req, res) => {
 });
 
 app.get('/api/etiquetas', async (req, res) => {
-    const etiquetas = await prisma.etiqueta.findMany();
-    res.json(etiquetas);
+    try {
+        const etiquetas = await prisma.etiqueta.findMany({ orderBy: { nome: 'asc' } });
+        res.json(etiquetas);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/etiquetas', async (req, res) => {
-    const etiqueta = await prisma.etiqueta.create({ data: req.body });
-    res.json(etiqueta);
+    try {
+        const { nome, cor, followup_texto, followup_horas } = req.body;
+        const etiqueta = await prisma.etiqueta.create({ 
+            data: { 
+                nome, 
+                cor, 
+                followup_texto: followup_texto || null, 
+                followup_horas: parseInt(followup_horas) || null 
+            } 
+        });
+        res.json(etiqueta);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.put('/api/etiquetas/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { nome, cor, followup_texto, followup_horas } = req.body;
+        const etiqueta = await prisma.etiqueta.update({
+            where: { id: parseInt(id) },
+            data: { 
+                nome, 
+                cor, 
+                followup_texto: followup_texto || null, 
+                followup_horas: parseInt(followup_horas) || null 
+            }
+        });
+        res.json(etiqueta);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.delete('/api/etiquetas/:id', async (req, res) => {
-    await prisma.etiqueta.delete({ where: { id: parseInt(req.params.id) } });
-    res.json({ success: true });
+    try {
+        await prisma.etiqueta.delete({ where: { id: parseInt(req.params.id) } });
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.get('/api/respostas', async (req, res) => {

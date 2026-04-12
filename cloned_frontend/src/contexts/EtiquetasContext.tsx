@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 export interface Etiqueta {
   id: string;
@@ -14,35 +14,70 @@ interface EtiquetasContextType {
   addEtiqueta: (e: Omit<Etiqueta, 'id'>) => void;
   removeEtiqueta: (id: string) => void;
   updateEtiqueta: (id: string, data: Partial<Etiqueta>) => void;
+  loading: boolean;
 }
 
 const EtiquetasContext = createContext<EtiquetasContextType | null>(null);
 
-const defaultEtiquetas: Etiqueta[] = [
-  { id: '1', nome: 'VIP', cor: 'hsl(262 83% 58%)' },
-  { id: '2', nome: 'Novo', cor: 'hsl(199 89% 48%)' },
-  { id: '3', nome: 'Recorrente', cor: 'hsl(142 71% 45%)' },
-  { id: '4', nome: 'Atacado', cor: 'hsl(38 92% 50%)' },
-  { id: '5', nome: 'Urgente', cor: 'hsl(0 84% 60%)' },
-];
-
 export function EtiquetasProvider({ children }: { children: ReactNode }) {
-  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>(defaultEtiquetas);
+  const [etiquetas, setEtiquetas] = useState<Etiqueta[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const addEtiqueta = (e: Omit<Etiqueta, 'id'>) => {
-    setEtiquetas(prev => [...prev, { ...e, id: Date.now().toString() }]);
+  const loadEtiquetas = async () => {
+    try {
+      const res = await fetch('/api/etiquetas');
+      const data = await res.json();
+      setEtiquetas(data);
+    } catch (err) {
+      console.error('Erro ao carregar etiquetas:', err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const removeEtiqueta = (id: string) => {
-    setEtiquetas(prev => prev.filter(e => e.id !== id));
+  useEffect(() => {
+    loadEtiquetas();
+  }, []);
+
+  const addEtiqueta = async (e: Omit<Etiqueta, 'id'>) => {
+    try {
+      const res = await fetch('/api/etiquetas', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(e)
+      });
+      const nova = await res.json();
+      setEtiquetas(prev => [...prev, nova]);
+    } catch (err) {
+       console.error('Erro ao adicionar etiqueta:', err);
+    }
   };
 
-  const updateEtiqueta = (id: string, data: Partial<Etiqueta>) => {
-    setEtiquetas(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+  const removeEtiqueta = async (id: string) => {
+    try {
+      await fetch(`/api/etiquetas/${id}`, { method: 'DELETE' });
+      setEtiquetas(prev => prev.filter(e => String(e.id) !== String(id)));
+    } catch (err) {
+      console.error('Erro ao remover etiqueta:', err);
+    }
+  };
+
+  const updateEtiqueta = async (id: string, data: Partial<Etiqueta>) => {
+    try {
+      const res = await fetch(`/api/etiquetas/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      const atualizada = await res.json();
+      setEtiquetas(prev => prev.map(e => String(e.id) === String(id) ? atualizada : e));
+    } catch (err) {
+      console.error('Erro ao atualizar etiqueta:', err);
+    }
   };
 
   return (
-    <EtiquetasContext.Provider value={{ etiquetas, setEtiquetas, addEtiqueta, removeEtiqueta, updateEtiqueta }}>
+    <EtiquetasContext.Provider value={{ etiquetas, setEtiquetas, addEtiqueta, removeEtiqueta, updateEtiqueta, loading }}>
       {children}
     </EtiquetasContext.Provider>
   );
