@@ -224,10 +224,6 @@ app.post('/api/conversas/delete', async (req, res) => {
     if (!id) return res.status(400).json({ error: "ID não fornecido" });
     console.log(`🗑️ Excluindo conversa: ${id}`);
     try {
-        await prisma.conversa.update({
-            where: { id },
-            data: { etiquetas: { set: [] } }
-        });
         await prisma.mensagem.deleteMany({ where: { conversaId: id } });
         await prisma.conversa.delete({ where: { id } });
         res.json({ success: true });
@@ -244,6 +240,24 @@ app.get('/api/conversas', async (req, res) => {
             orderBy: { atualizado_em: 'desc' }
         });
         res.json(conversas);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/conversas/:id', async (req, res) => {
+    try {
+        const conversa = await prisma.conversa.findUnique({
+            where: { id: req.params.id },
+            include: { etiquetas: true }
+        });
+        if (!conversa) return res.status(404).json({ error: "Conversa não encontrada" });
+        
+        const mensagens = await prisma.mensagem.findMany({
+            where: { conversaId: req.params.id },
+            orderBy: { criado_em: 'asc' }
+        });
+        
+        // Pedidos removidos do schema nessa fase 4 simplificada, então enviamos array vazio para o Frontend não quebrar
+        res.json({ conversa, mensagens, pedidos: [] });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
