@@ -109,6 +109,10 @@ export async function salvarResposta(resposta: Omit<RespostaRapida, 'id'>): Prom
   });
 }
 
+export async function deletarResposta(id: string) {
+  return tryFetch(`/api/respostas/${id}`, { method: 'DELETE' });
+}
+
 export async function agendarFollowUp(id: string, config: FollowUpConfig & { proximo_followup: string }) {
   return tryFetch(`/api/conversas/${id}/followup`, {
     method: 'POST',

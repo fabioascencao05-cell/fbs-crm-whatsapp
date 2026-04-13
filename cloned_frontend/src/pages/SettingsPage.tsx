@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { fetchRespostas, salvarResposta } from '@/services/api';
+import { fetchRespostas, salvarResposta, deletarResposta } from '@/services/api';
 import type { RespostaRapida } from '@/types/crm';
 import { useEtiquetas } from '@/contexts/EtiquetasContext';
 import { useLogo } from '@/contexts/LogoContext';
@@ -85,8 +85,13 @@ export default function SettingsPage() {
     setShowNewResposta(false);
   };
 
-  const handleDeleteResposta = (id: string) => {
-    setRespostas(prev => prev.filter(r => r.id !== id));
+  const handleDeleteResposta = async (id: string) => {
+    try {
+      await deletarResposta(id);
+      setRespostas(prev => prev.filter(r => r.id !== id));
+    } catch (e) {
+      console.error('Erro ao deletar:', e);
+    }
   };
 
   const handleEditResposta = (r: RespostaRapida) => {

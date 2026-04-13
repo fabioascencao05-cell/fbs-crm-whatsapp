@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, Image, Video, Clock, Trash2, ArrowLeft, X, CalendarClock, Power, PowerOff, Mic, Columns3 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import type { Conversa, Mensagem, RespostaRapida } from '@/types/crm';
 import { ImageLightbox } from './ImageLightbox';
