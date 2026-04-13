@@ -479,18 +479,35 @@ app.post('/api/webhook', async (req, res) => {
     else if (data.data.message?.audioMessage) mediaType = 'audio';
     else if (data.data.message?.documentMessage) mediaType = 'document';
 
-    // Se for mensagem enviada pelo humano, silencia a Deise
+    // 1) Ignorar eventos de sistema puros ou ações sem texto/mídia
+    if (!texto && !mediaType) return res.sendStatus(200);
+
+    // 2) Ignorar avisos automáticos do sistema do Facebook/Instagram sobre Ads
+    if (texto.includes('Esta conversa foi iniciada em um anúncio') || texto.includes('O compartilhamento de dados')) {
+        console.log('🛡️ Ignorando mensagem automática de Ads do Facebook.');
+        return res.sendStatus(200);
+    }
+
+    // Se for mensagem enviada pela "loja" (pode ser o humano OU webhook do bot)
     if (isFromMe) {
+        // Verifica se a Deise acabou de enviar essa mensagem (evita auto-silenciamento)
+        const lastBotSent = recentSystemMessages.get(number);
+        if (lastBotSent && (Date.now() - lastBotSent) < 10000) {
+            console.log('🤖 Ignorando webhook de mensagem recém enviada pela Deise.');
+            return res.sendStatus(200);
+        }
+
+        // Se chegou aqui, é realmente um humano digitando ou enviando arquivo
         await prisma.conversa.upsert({
             where: { id: remoteJid },
             update: { assumido_por: 'humano', ultima_mensagem: texto || `[Arquivo ${mediaType}]`, atualizado_em: new Date() },
             create: { id: remoteJid, nome: pushName, telefone: number, ultima_mensagem: texto || `[Arquivo ${mediaType}]`, assumido_por: 'humano' }
         });
-        if (texto || mediaType) {
-            await prisma.mensagem.create({
-                data: { conversaId: remoteJid, texto: texto || '', mediaType, origem: 'loja' }
-            });
-        }
+        
+        await prisma.mensagem.create({
+            data: { conversaId: remoteJid, texto: texto || '', mediaType, origem: 'loja' }
+        });
+        
         return res.sendStatus(200);
     }
 
