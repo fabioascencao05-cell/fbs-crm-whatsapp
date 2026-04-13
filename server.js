@@ -17,6 +17,14 @@ const prisma = new PrismaClient();
 const upload = multer();
 
 app.use(cors());
+
+// Prevenir cache em rotas da API para garantir tempo real no dashboard e chat
+app.use('/api', (req, res, next) => {
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    next();
+});
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 

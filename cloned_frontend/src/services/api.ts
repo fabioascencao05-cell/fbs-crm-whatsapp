@@ -1,8 +1,18 @@
 import type { Conversa, Mensagem, Pedido, RespostaRapida, FollowUpConfig } from '@/types/crm';
 
-async function tryFetch<T>(url: string, options?: RequestInit): Promise<T> {
-  // Na VPS usamos caminhos relativos /api/...
-  const res = await fetch(url, options);
+async function tryFetch<T>(url: string, options: RequestInit = {}): Promise<T> {
+  const finalOptions: RequestInit = {
+    ...options,
+    headers: {
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      ...(options.headers || {})
+    },
+    cache: 'no-store' as RequestCache
+  };
+
+  const res = await fetch(url, finalOptions);
   if (!res.ok) {
     const error = await res.json().catch(() => ({}));
     throw new Error(error.message || 'Erro na requisição');
