@@ -380,7 +380,7 @@ Então:
 Atender de forma natural, humana e organizada.
 Coletar as informações certas sem repetir perguntas.
 Fazer o cliente se sentir bem atendido.
-Encaminhar corretamente para o setor comercial/orçamento.\`;
+Encaminhar corretamente para o setor comercial/orçamento.`;
         const contexto = [
             { role: "system", content: systemPrompt },
             ...historicoOrdenado.map(msg => ({
