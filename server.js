@@ -1,5 +1,6 @@
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const bodyParser = require('body-parser');
 const axios = require('axios');
 const multer = require('multer');
@@ -83,26 +84,23 @@ Exemplo:
 "Não, sou a Deise mesmo 😊 tô aqui pra te ajudar."
 
 Seu jeito de falar:
-- natural
-- simples e objetiva
-- humana (mostre empatia)
-- comercial mas amigável
-- educada
-- sem parecer um atendente de telemarketing ou script automático
+- calorosa e simpática, como uma colega de trabalho gente boa
+- natural e descontraída, sem ser informal demais
+- empática: se o cliente parecer empolgado, demonstre entusiasmo
+- objetiva: não enrola, mas sem ser grossa ou seca
+- sem parecer robô, script ou telemarketing
 
 Regras de escrita:
 - MÁXIMO 2 frases por resposta. Nunca mais que isso.
-- linguagem de WhatsApp, curta e direta
+- linguagem de WhatsApp: simples, direta, humana
 - proibido listas ou bullet points
 - sem excesso de pontuação
-- sem formalidade exagerada
 - nunca repita na mesma mensagem o que já foi dito antes
 
 😊 USO DE EMOJIS
-- usar emoji apenas na primeira mensagem da conversa
-- usar emoji apenas na mensagem final de encaminhamento
-- no restante da conversa, sem emoji
-- máximo 1 emoji quando usar
+- use emojis com moderação para dar calor humano (máx 1 por mensagem)
+- preferência para: 😊 🙂 👍 😄
+- não use emoji em toda mensagem, só quando trouxer leveza natural
 
 📌 OBJETIVO PRINCIPAL
 
@@ -420,6 +418,43 @@ Encaminhar corretamente para o setor de orçamentos.`;
     }
 }
 
+// ==========================================
+// TRANSCRIÇÃO DE ÁUDIO (WHISPER)
+// ==========================================
+async function transcreverAudio(audioUrl) {
+    if (!openai) {
+        console.log('⚠️ OpenAI não configurada — transcrição de áudio indisponível.');
+        return null;
+    }
+    try {
+        console.log('🎤 Baixando áudio para transcrição...');
+        const response = await axios({
+            url: audioUrl,
+            method: 'GET',
+            responseType: 'arraybuffer',
+            headers: { 'apikey': process.env.EVOLUTION_API_KEY }
+        });
+
+        const tmpPath = path.join(__dirname, 'tmp', `audio_${Date.now()}.ogg`);
+        fs.mkdirSync(path.join(__dirname, 'tmp'), { recursive: true });
+        fs.writeFileSync(tmpPath, Buffer.from(response.data));
+
+        console.log('🎙️ Transcrevendo áudio com Whisper...');
+        const transcription = await openai.audio.transcriptions.create({
+            file: fs.createReadStream(tmpPath),
+            model: 'whisper-1',
+            language: 'pt'
+        });
+
+        fs.unlinkSync(tmpPath); // Remove arquivo temporário
+        console.log(`✅ Transcrição: ${transcription.text}`);
+        return transcription.text;
+    } catch (err) {
+        console.error('❌ Erro na transcrição de áudio:', err.message);
+        return null;
+    }
+}
+
 const enviarMensagemEvolution = async (number, text) => {
     try {
         const url = `${process.env.EVOLUTION_API_URL}/message/sendText/${process.env.EVOLUTION_INSTANCE}`;
@@ -515,6 +550,25 @@ app.post('/api/webhook', async (req, res) => {
         create: { id: remoteJid, nome: pushName, telefone: number, ultima_mensagem: texto || `[Arquivo ${mediaType}]` }
     });
 
+    // Transcrição de áudio: se for áudio do cliente, tenta transcrever com Whisper
+    let textoPraIA = texto;
+    if (mediaType === 'audio' && !isFromMe && conversa.status_bot && conversa.status_kanban === 'Novos' && !conversa.assumido_por) {
+        try {
+            const mediaMsg = data.data.message?.audioMessage;
+            const audioUrl = mediaMsg?.url || data.data.message?.base64;
+            if (audioUrl && audioUrl.startsWith('http')) {
+                const transcricao = await transcreverAudio(audioUrl);
+                if (transcricao) {
+                    textoPraIA = transcricao;
+                    texto = transcricao; // salvar no banco como texto
+                    console.log(`🎤 Áudio transcrito: "${transcricao}"`);
+                }
+            }
+        } catch (audioErr) {
+            console.error('❌ Erro ao processar áudio:', audioErr.message);
+        }
+    }
+
     if (texto || mediaType) {
         await prisma.mensagem.create({
             data: { conversaId: remoteJid, texto: texto || '', mediaType, origem: 'cliente' }
@@ -522,7 +576,7 @@ app.post('/api/webhook', async (req, res) => {
     }
 
     // Deise só responde se: bot ON + estágio Novos + sem humano assumido
-    if (texto && conversa.status_bot && conversa.status_kanban === 'Novos' && !conversa.assumido_por) {
+    if ((textoPraIA || texto) && conversa.status_bot && conversa.status_kanban === 'Novos' && !conversa.assumido_por) {
         // Debounce: se o cliente mandar várias mensagens rápido, espera 5s sem nova msg antes de responder
         if (debounceTimers.has(remoteJid)) {
             clearTimeout(debounceTimers.get(remoteJid));
