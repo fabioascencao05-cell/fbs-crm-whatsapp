@@ -41,6 +41,8 @@ export interface Mensagem {
   mediaType: '' | 'image' | 'audio' | 'video' | 'contact' | 'document';
   mediaUrl?: string;
   mimeType?: string;
+  wamid?: string;
+  status_leitura?: string;
   criado_em: string;
 }
 

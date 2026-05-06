@@ -51,8 +51,10 @@ model Mensagem {
   texto      String
   
   // Phase 5 Fills
-  mediaUrl   String?
-  mediaType  String?  // 'image', 'audio', 'video', 'document'
+  mediaUrl       String?
+  mediaType      String?  // 'image', 'audio', 'video', 'document'
+  wamid          String?  @unique // ID da mensagem no WhatsApp (para read receipts)
+  status_leitura String?  // 'SENT', 'DELIVERED', 'READ'
   
   // Master Phase
   agendado_para DateTime?

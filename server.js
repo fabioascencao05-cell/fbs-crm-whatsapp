@@ -454,9 +454,9 @@ Encaminhar corretamente para o setor de orçamentos.${contextSummary}`;
         }
         if (respostaIA) {
             console.log(`✅ Deise Respondeu: ${respostaIA}`);
-            await enviarMensagemEvolution(remoteJid.split('@')[0], respostaIA);
+            const novoWamid = await enviarMensagemEvolution(remoteJid.split('@')[0], respostaIA);
             const msgSalva = await prisma.mensagem.create({
-                data: { conversaId: remoteJid, texto: respostaIA, origem: 'bot' }
+                data: { conversaId: remoteJid, texto: respostaIA, origem: 'bot', wamid: novoWamid }
             });
             console.log(`💾 Salvo no banco: ID ${msgSalva.id}`);
             recentSystemMessages.set(remoteJid.split('@')[0], Date.now());
@@ -552,11 +552,47 @@ async function transcreverAudio(messageKey) {
 const enviarMensagemEvolution = async (number, text) => {
     try {
         const url = `${process.env.EVOLUTION_API_URL}/message/sendText/${process.env.EVOLUTION_INSTANCE}`;
-        await axios.post(url, { number, text }, {
+        const response = await axios.post(url, { number, text }, {
             headers: { 'apikey': process.env.EVOLUTION_API_KEY }
         });
-    } catch (err) { console.error('Erro Evolution:', err.message); }
+        return response.data?.key?.id; // Retorna o wamid
+    } catch (err) { console.error('Erro Evolution:', err.message); return null; }
 };
+
+async function processarE_SalvarMedia(messageKey, mediaType) {
+    if (!mediaType) return null;
+    try {
+        const evolutionUrl = `${process.env.EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${process.env.EVOLUTION_INSTANCE}`;
+        const mediaResponse = await axios.post(evolutionUrl, {
+            message: { key: messageKey },
+            convertToMp4: false
+        }, {
+            headers: { 'apikey': process.env.EVOLUTION_API_KEY },
+            timeout: 30000
+        });
+
+        const base64Data = mediaResponse.data?.base64;
+        if (!base64Data) return null;
+
+        let ext = '.bin';
+        if (mediaType === 'image') ext = '.jpg';
+        else if (mediaType === 'video') ext = '.mp4';
+        else if (mediaType === 'audio') ext = '.ogg';
+        else if (mediaType === 'document') ext = '.pdf';
+
+        const filename = `${mediaType}_${Date.now()}${ext}`;
+        const publicMediaDir = path.join(__dirname, 'public', 'media');
+        if (!fs.existsSync(publicMediaDir)) fs.mkdirSync(publicMediaDir, { recursive: true });
+        
+        const filePath = path.join(publicMediaDir, filename);
+        fs.writeFileSync(filePath, Buffer.from(base64Data, 'base64'));
+        
+        return `/media/${filename}`;
+    } catch (err) {
+        console.error('❌ Erro ao baixar e salvar mídia:', err.message);
+        return null;
+    }
+}
 
 // ==========================================
 // AUTENTICAÇÃO
@@ -585,10 +621,35 @@ app.post('/api/login', async (req, res) => {
 // ==========================================
 app.post('/api/webhook', async (req, res) => {
     const data = req.body;
+    
+    // TRATAR STATUS DE LEITURA (messages.update)
+    if (data.event === 'messages.update' && Array.isArray(data.data)) {
+        for (const update of data.data) {
+            if (update.update && update.update.status) {
+                const wamid = update.key?.id;
+                let statusName = '';
+                if (update.update.status === 2) statusName = 'SENT';
+                else if (update.update.status === 3) statusName = 'DELIVERED';
+                else if (update.update.status === 4) statusName = 'READ';
+                
+                if (wamid && statusName) {
+                    try {
+                        await prisma.mensagem.update({
+                            where: { wamid },
+                            data: { status_leitura: statusName }
+                        });
+                    } catch(e) { /* msg não encontrada no banco, normal */ }
+                }
+            }
+        }
+        return res.sendStatus(200);
+    }
+
     if (!data.data || !data.data.key) return res.sendStatus(200);
 
     const remoteJid = data.data.key.remoteJid;
     const isFromMe = data.data.key.fromMe;
+    const wamid = data.data.key.id;
     const number = remoteJid.split('@')[0];
     const pushName = data.data.pushName || 'Cliente';
 
@@ -625,6 +686,11 @@ app.post('/api/webhook', async (req, res) => {
         }
 
         // Se chegou aqui, é realmente um humano digitando ou enviando arquivo
+        let savedMediaUrl = null;
+        if (mediaType) {
+            savedMediaUrl = await processarE_SalvarMedia(data.data.key, mediaType);
+        }
+
         await prisma.conversa.upsert({
             where: { id: remoteJid },
             update: { assumido_por: 'humano', ultima_mensagem: texto || `[Arquivo ${mediaType}]`, atualizado_em: new Date() },
@@ -632,10 +698,15 @@ app.post('/api/webhook', async (req, res) => {
         });
         
         await prisma.mensagem.create({
-            data: { conversaId: remoteJid, texto: texto || '', mediaType, origem: 'loja' }
+            data: { conversaId: remoteJid, texto: texto || '', mediaType, mediaUrl: savedMediaUrl, wamid, origem: 'loja' }
         });
         
         return res.sendStatus(200);
+    }
+
+    let savedMediaUrl = null;
+    if (mediaType) {
+        savedMediaUrl = await processarE_SalvarMedia(data.data.key, mediaType);
     }
 
     const conversa = await prisma.conversa.upsert({
@@ -666,7 +737,7 @@ app.post('/api/webhook', async (req, res) => {
 
     if (texto || mediaType) {
         await prisma.mensagem.create({
-            data: { conversaId: remoteJid, texto: texto || '', mediaType, origem: 'cliente' }
+            data: { conversaId: remoteJid, texto: texto || '', mediaType, mediaUrl: savedMediaUrl, wamid, origem: 'cliente' }
         });
     }
 
@@ -820,9 +891,9 @@ app.post('/api/conversas/:id/enviar', async (req, res) => {
     const { id } = req.params;
     const { texto } = req.body;
     try {
-        await enviarMensagemEvolution(id.split('@')[0], texto);
+        const novoWamid = await enviarMensagemEvolution(id.split('@')[0], texto);
         const msg = await prisma.mensagem.create({
-            data: { conversaId: id, texto, origem: 'loja' }
+            data: { conversaId: id, texto, origem: 'loja', wamid: novoWamid }
         });
         // Marca como assumido por humano
         await prisma.conversa.update({
@@ -1162,11 +1233,11 @@ app.post('/api/broadcast', async (req, res) => {
     for (const id of ids) {
         try {
             const number = id.includes('@') ? id.split('@')[0] : id.replace(/\D/g, ''); // Extract number only
-            await enviarMensagemEvolution(number, texto);
+            const novoWamid = await enviarMensagemEvolution(number, texto);
             
             try {
                 await prisma.mensagem.create({
-                    data: { conversaId: id.includes('@') ? id : `${number}@s.whatsapp.net`, texto, origem: 'loja' }
+                    data: { conversaId: id.includes('@') ? id : `${number}@s.whatsapp.net`, texto, origem: 'loja', wamid: novoWamid }
                 });
             } catch (dbErr) {
                 // Number is not in Conversa DB, this is normal for manual broadcast list
@@ -1340,9 +1411,9 @@ cron.schedule('*/5 * * * *', async () => {
 
         for (const fu of agendados) {
             try {
-                await enviarMensagemEvolution(fu.conversa.telefone, fu.texto);
+                const novoWamid = await enviarMensagemEvolution(fu.conversa.telefone, fu.texto);
                 await prisma.mensagem.create({
-                    data: { conversaId: fu.conversaId, texto: fu.texto, origem: 'loja' }
+                    data: { conversaId: fu.conversaId, texto: fu.texto, origem: 'loja', wamid: novoWamid }
                 });
                 await prisma.followUp.update({
                     where: { id: fu.id },
@@ -1371,9 +1442,9 @@ cron.schedule('*/5 * * * *', async () => {
                 }
             });
             for (const lead of conversas) {
-                await enviarMensagemEvolution(lead.telefone, etiqueta.followup_texto);
+                const novoWamid = await enviarMensagemEvolution(lead.telefone, etiqueta.followup_texto);
                 await prisma.mensagem.create({
-                    data: { conversaId: lead.id, texto: etiqueta.followup_texto, origem: 'bot' }
+                    data: { conversaId: lead.id, texto: etiqueta.followup_texto, origem: 'bot', wamid: novoWamid }
                 });
                 await prisma.conversa.update({
                     where: { id: lead.id },
@@ -1465,9 +1536,9 @@ cron.schedule('*/5 * * * *', async () => {
                 }
 
                 // Envia a mensagem atual do funil
-                await enviarMensagemEvolution(lead.telefone, msgAtual.texto);
+                const novoWamid = await enviarMensagemEvolution(lead.telefone, msgAtual.texto);
                 await prisma.mensagem.create({
-                    data: { conversaId: lead.id, texto: msgAtual.texto, origem: 'loja' }
+                    data: { conversaId: lead.id, texto: msgAtual.texto, origem: 'loja', wamid: novoWamid }
                 });
 
                 const proxStep = stepIdx + 2; // próximo step (1-indexed)

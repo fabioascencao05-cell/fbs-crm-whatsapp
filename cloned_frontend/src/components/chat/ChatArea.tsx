@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, Image, Video, Clock, Trash2, ArrowLeft, X, CalendarClock, Power, PowerOff, Mic, Columns3 } from 'lucide-react';
+import { Send, Paperclip, Image, Video, Clock, Trash2, ArrowLeft, X, CalendarClock, Power, PowerOff, Mic, Columns3, Check, CheckCheck } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -300,31 +300,31 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
               {/* Image */}
               {m.mediaType === 'image' && m.mediaUrl && (
                 <img
-                  src={`/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}`}
+                  src={m.mediaUrl.startsWith('http') ? `/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}` : m.mediaUrl}
                   alt="Imagem"
                   loading="lazy"
-                  onClick={() => setLightboxUrl(`/api/proxy-media?url=${encodeURIComponent(m.mediaUrl!)}`)}
+                  onClick={() => setLightboxUrl(m.mediaUrl!)}
                   className="rounded-lg max-w-full max-h-[240px] object-cover cursor-pointer hover:opacity-90 transition-opacity mb-1"
                 />
               )}
 
               {/* Audio */}
               {m.mediaType === 'audio' && m.mediaUrl && (
-                <AudioPlayer src={`/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}`} className="my-1" />
+                <AudioPlayer src={m.mediaUrl.startsWith('http') ? `/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}` : m.mediaUrl} className="my-1" />
               )}
 
               {/* Video */}
               {m.mediaType === 'video' && m.mediaUrl && (
                 <div className="mb-2 rounded-lg overflow-hidden border border-border/50 bg-black/5">
                    <video controls className="max-w-full h-auto">
-                     <source src={`/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}`} type="video/mp4" />
+                     <source src={m.mediaUrl.startsWith('http') ? `/api/proxy-media?url=${encodeURIComponent(m.mediaUrl)}` : m.mediaUrl} type="video/mp4" />
                    </video>
                 </div>
               )}
 
               {/* Document */}
               {m.mediaType === 'document' && m.mediaUrl && (
-                <div className="mb-2 flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-border/50 cursor-pointer hover:bg-secondary/50 transition-colors" onClick={() => window.open(`/api/proxy-media?url=${encodeURIComponent(m.mediaUrl!)}`, '_blank')}>
+                <div className="mb-2 flex items-center gap-3 p-3 bg-secondary/30 rounded-xl border border-border/50 cursor-pointer hover:bg-secondary/50 transition-colors" onClick={() => window.open(m.mediaUrl!, '_blank')}>
                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
                       <Paperclip size={20} />
                    </div>
@@ -336,7 +336,16 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
               )}
 
               {m.texto && <p className="leading-relaxed whitespace-pre-wrap">{m.texto}</p>}
-              <p className="text-[10px] text-muted-foreground text-right mt-1">{formatWhatsAppTime(m.criado_em)}</p>
+              <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-muted-foreground">
+                <p>{formatWhatsAppTime(m.criado_em)}</p>
+                {m.origem !== 'cliente' && (
+                  <span className={cn(m.status_leitura === 'READ' ? 'text-blue-500' : 'text-muted-foreground/60')}>
+                    {m.status_leitura === 'READ' ? <CheckCheck size={12} strokeWidth={3} /> :
+                     m.status_leitura === 'DELIVERED' ? <CheckCheck size={12} strokeWidth={2} /> :
+                     <Check size={12} strokeWidth={2} />}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
