@@ -24,11 +24,16 @@ interface Props {
 }
 
 function formatWhatsAppTime(d: string) {
-  return new Date(d).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  if (!d) return '';
+  const dt = new Date(d);
+  if (isNaN(dt.getTime())) return '';
+  return dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
 function formatDateSeparator(d: string) {
+  if (!d) return '';
   const date = new Date(d);
+  if (isNaN(date.getTime())) return '';
   const today = new Date();
   const yesterday = new Date();
   yesterday.setDate(today.getDate() - 1);
@@ -44,7 +49,9 @@ function formatDateSeparator(d: string) {
 }
 
 function getDayKey(d: string) {
+  if (!d) return 'unknown';
   const date = new Date(d);
+  if (isNaN(date.getTime())) return 'unknown';
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
 }
 
@@ -305,11 +312,12 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
       {/* Messages */}
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-thin chat-pattern">
         {(() => {
+          if (!Array.isArray(mensagens)) return null;
           const items: React.ReactNode[] = [];
           let lastDay = '';
           mensagens.forEach((m) => {
-            const day = getDayKey(m.criado_em);
-            if (day !== lastDay) {
+            const day = getDayKey(m?.criado_em || '');
+            if (day !== lastDay && day !== 'unknown') {
               lastDay = day;
               items.push(
                 <div key={`sep-${day}`} className="flex items-center gap-3 my-3">
