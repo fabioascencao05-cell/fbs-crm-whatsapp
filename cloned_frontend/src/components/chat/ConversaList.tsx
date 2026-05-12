@@ -96,10 +96,15 @@ export function ConversaList({ conversas, activeId, onSelect, onSync }: Props) {
     
     // Pesquisa por texto
     if (search) {
-      list = list.filter(c => 
-        c.nome.toLowerCase().includes(search.toLowerCase()) || 
-        c.telefone.includes(search)
-      );
+      if (search.startsWith('kanban:')) {
+        const kanbanStage = search.split(':')[1];
+        list = list.filter(c => c.status_kanban === kanbanStage);
+      } else {
+        list = list.filter(c => 
+          c.nome.toLowerCase().includes(search.toLowerCase()) || 
+          c.telefone.includes(search)
+        );
+      }
     }
     
     // Filtro por Etiquetas (Tags)
@@ -181,14 +186,35 @@ export function ConversaList({ conversas, activeId, onSelect, onSync }: Props) {
           })}
         </div>
 
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar por nome ou telefone..."
-            className="pl-9 h-9 text-sm bg-secondary border-0 rounded-xl"
-          />
+        <div className="flex gap-2 relative">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar..."
+              className="pl-9 h-9 text-sm bg-secondary border-0 rounded-xl w-full"
+            />
+          </div>
+          <select
+            className="h-9 text-xs bg-secondary border-0 rounded-xl px-2 font-medium text-muted-foreground focus:ring-1 focus:ring-primary outline-none"
+            onChange={e => {
+              // We can use the Search state to store a special prefix for Kanban filtering, 
+              // or better yet, add a new state. Since adding state requires more changes,
+              // let's just prefix the search for simplicity, e.g., "kanban:Novos"
+              if (e.target.value) {
+                setSearch('kanban:' + e.target.value);
+              } else {
+                setSearch(search.startsWith('kanban:') ? '' : search);
+              }
+            }}
+            value={search.startsWith('kanban:') ? search.split(':')[1] : ''}
+          >
+            <option value="">Todas as Etapas</option>
+            {KANBAN_COLUMNS.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
         </div>
 
         <div className="flex gap-1 bg-secondary rounded-xl p-1">

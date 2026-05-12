@@ -63,4 +63,4 @@ export interface RespostaRapida {
   texto: string;
 }
 
-export const KANBAN_COLUMNS = ['Novos', 'Em Negociação', 'Fechados', 'Finalizados'] as const;
+export const KANBAN_COLUMNS = ['Novos', 'Em Negociação', 'Aguardando Pagamento', 'Pedido Aprovado', 'Pedido Entregue', 'Não Fechou'] as const;

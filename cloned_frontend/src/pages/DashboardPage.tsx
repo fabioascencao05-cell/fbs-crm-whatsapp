@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { fetchConversas } from '@/services/api';
 import type { Conversa } from '@/types/crm';
+import { KANBAN_COLUMNS } from '@/types/crm';
 import { useEtiquetas } from '@/contexts/EtiquetasContext';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
@@ -56,14 +57,13 @@ export default function DashboardPage() {
   const unread = filtered.reduce((s, c) => s + c.unreadCount, 0);
 
   // Dynamic pipeline columns for pie chart (Valores Financeiros)
-  const pipelineNames = ['Novos', 'Em Negociação', 'Aguardando Pagamento', 'Pedido Aprovado', 'Pedido Entregue'];
-  const pieData = pipelineNames.map(col => ({
+  const pieData = [...KANBAN_COLUMNS].map(col => ({
     name: col,
     value: filtered.filter(c => c.status_kanban === col).reduce((acc, c) => acc + (c.valor_conversa || 0), 0),
   })).filter(d => d.value > 0);
 
   // Se não houver valores, usa contagem como fallback para o gráfico não ficar vazio
-  const chartData = pieData.length > 0 ? pieData : pipelineNames.map(col => ({
+  const chartData = pieData.length > 0 ? pieData : [...KANBAN_COLUMNS].map(col => ({
     name: col,
     value: filtered.filter(c => c.status_kanban === col).length,
   }));

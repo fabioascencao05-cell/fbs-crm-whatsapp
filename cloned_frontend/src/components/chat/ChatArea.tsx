@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
+import { KANBAN_COLUMNS } from '@/types/crm';
 import type { Conversa, Mensagem, RespostaRapida } from '@/types/crm';
 import { ImageLightbox } from './ImageLightbox';
 import { AudioPlayer } from './AudioPlayer';
@@ -259,7 +260,7 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
           onChange={e => handleKanbanChange(e.target.value)}
           className="flex-1 min-w-0 text-xs border rounded-lg px-2 py-1.5 bg-secondary text-secondary-foreground font-medium focus:ring-2 focus:ring-ring focus:outline-none"
         >
-          {['Novos', 'Em Negociação', 'Aguardando Pagamento', 'Pedido Aprovado', 'Pedido Entregue'].map(col => (
+          {KANBAN_COLUMNS.map(col => (
             <option key={col} value={col}>{col}</option>
           ))}
         </select>
@@ -473,7 +474,7 @@ export function ChatArea({ conversa, mensagens, respostas, onMensagemEnviada, on
                  className="h-8 text-[10px] font-bold bg-success/10 text-success border-none rounded-lg px-2 focus:ring-1 focus:ring-success outline-none"
                >
                  <option value="">Não mover etapa</option>
-                 {['Novos', 'Em Negociação', 'Aguardando Pagamento', 'Pedido Aprovado', 'Pedido Entregue'].map(col => (
+                 {KANBAN_COLUMNS.map(col => (
                    <option key={col} value={col}>Mover para: {col}</option>
                  ))}
                </select>
