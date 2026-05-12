@@ -565,12 +565,12 @@ const enviarMensagemEvolution = async (number, text) => {
     } catch (err) { console.error('Erro Evolution:', err.message); return null; }
 };
 
-async function processarE_SalvarMedia(messageKey, mediaType) {
+async function processarE_SalvarMedia(fullMessageObj, mediaType) {
     if (!mediaType) return null;
     try {
         const evolutionUrl = `${process.env.EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${process.env.EVOLUTION_INSTANCE}`;
         const mediaResponse = await axios.post(evolutionUrl, {
-            message: { key: messageKey },
+            message: fullMessageObj,
             convertToMp4: false
         }, {
             headers: { 'apikey': process.env.EVOLUTION_API_KEY },
@@ -629,14 +629,17 @@ app.post('/api/webhook', async (req, res) => {
     const data = req.body;
     
     // TRATAR STATUS DE LEITURA (messages.update)
-    if (data.event === 'messages.update' && Array.isArray(data.data)) {
-        for (const update of data.data) {
-            if (update.update && update.update.status) {
+    if (data.event === 'messages.update') {
+        const updates = Array.isArray(data.data) ? data.data : (data.data ? [data.data] : []);
+        for (const update of updates) {
+            if (update.update && update.update.status !== undefined) {
                 const wamid = update.key?.id;
                 let statusName = '';
-                if (update.update.status === 2) statusName = 'SENT';
-                else if (update.update.status === 3) statusName = 'DELIVERED';
-                else if (update.update.status === 4) statusName = 'READ';
+                const s = update.update.status;
+                
+                if (s === 2 || s === 'SERVER_ACK' || s === 'SENT') statusName = 'SENT';
+                else if (s === 3 || s === 'DELIVERY_ACK' || s === 'DELIVERED') statusName = 'DELIVERED';
+                else if (s === 4 || s === 'READ' || s === 'PLAYED') statusName = 'READ';
                 
                 if (wamid && statusName) {
                     try {
@@ -694,7 +697,7 @@ app.post('/api/webhook', async (req, res) => {
         // Se chegou aqui, é realmente um humano digitando ou enviando arquivo
         let savedMediaUrl = null;
         if (mediaType) {
-            savedMediaUrl = await processarE_SalvarMedia(data.data.key, mediaType);
+            savedMediaUrl = await processarE_SalvarMedia(data.data, mediaType);
         }
 
         await prisma.conversa.upsert({
@@ -712,7 +715,7 @@ app.post('/api/webhook', async (req, res) => {
 
     let savedMediaUrl = null;
     if (mediaType) {
-        savedMediaUrl = await processarE_SalvarMedia(data.data.key, mediaType);
+        savedMediaUrl = await processarE_SalvarMedia(data.data, mediaType);
     }
 
     const conversa = await prisma.conversa.upsert({
