@@ -18,6 +18,23 @@ export default function ChatPage() {
   const [showPanel, setShowPanel] = useState(true);
 
   useEffect(() => {
+    // Initial load and URL param handling
+    fetchConversas().then(data => {
+      setConversas(data);
+      const chatId = searchParams.get('chat');
+      if (chatId) {
+        const found = data.find(c => c.id === chatId);
+        if (found) {
+          setActive(found);
+          fetchMensagens(found.id).then(res => setMensagens(res.mensagens));
+          setMobileView('chat');
+        }
+      }
+    });
+    fetchRespostas().then(setRespostas);
+  }, []); // Only on mount
+
+  useEffect(() => {
     const load = () => {
       fetchConversas().then(setConversas);
       if (active) {
@@ -25,27 +42,21 @@ export default function ChatPage() {
       }
     };
 
-    // Initial load
-    fetchConversas().then(data => {
-      setConversas(data);
-      const chatId = searchParams.get('chat');
-      if (chatId) {
-        const found = data.find(c => c.id === chatId);
-        if (found) handleSelect(found);
-      }
-    });
-    fetchRespostas().then(setRespostas);
-
     // Fast Polling (3s) for real-time feel
     const timer = setInterval(load, 3000);
     return () => clearInterval(timer);
-  }, [active?.id, searchParams]);
+  }, [active?.id]);
 
   const handleSelect = async (c: Conversa) => {
     setActive(c);
     const data = await fetchMensagens(c.id);
     setMensagens(data.mensagens);
     setMobileView('chat');
+    
+    // Update URL to match selected chat without reloading page
+    const newUrl = new URL(window.location.href);
+    newUrl.searchParams.set('chat', c.id);
+    window.history.pushState({}, '', newUrl);
   };
 
   const handleMensagemEnviada = (m: Mensagem) => {
