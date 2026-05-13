@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { KANBAN_COLUMNS } from '@/types/crm';
 import type { Conversa } from '@/types/crm';
 import { useEtiquetas } from '@/contexts/EtiquetasContext';
 import { syncConversas } from '@/services/api';
